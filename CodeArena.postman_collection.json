@@ -1,0 +1,1078 @@
+{
+	"info": {
+		"_postman_id": "codearena-backend-api",
+		"name": "CodeArena Backend API",
+		"description": "Complete API collection for CodeArena - Coding Contest Reminder Platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "contestId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reminderId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testEmail",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Response has user data', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.success).to.be.true;",
+									"    pm.expect(response.data.user).to.have.property('email');",
+									"    pm.expect(response.data.user).to.have.property('username');",
+									"    pm.expect(response.data.user.isVerified).to.be.false;",
+									"});",
+									"",
+									"pm.test('Requires email verification', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data.requiresVerification).to.be.true;",
+									"    pm.expect(response.message).to.include('OTP');",
+									"});",
+									"",
+									"pm.test('No tokens provided before verification', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data).to.not.have.property('accessToken');",
+									"    pm.expect(response.data).to.not.have.property('refreshToken');",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('testEmail', response.data.user.email);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"username\": \"testuser\",\n  \"fullName\": \"Test User\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
+						},
+						"description": "Register a new user account"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Email verified successfully', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.success).to.be.true;",
+									"    pm.expect(response.message).to.include('verified');",
+									"});",
+									"",
+									"pm.test('Tokens are provided', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data).to.have.property('accessToken');",
+									"    pm.expect(response.data).to.have.property('refreshToken');",
+									"    pm.expect(response.data.user.isVerified).to.be.true;",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+									"    pm.collectionVariables.set('userId', response.data.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify-otp"]
+						},
+						"description": "Verify email with OTP received via email (check your inbox for 6-digit code)"
+					},
+					"response": []
+				},
+				{
+					"name": "Resend OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('OTP resent successfully', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.success).to.be.true;",
+									"    pm.expect(response.message).to.include('resent');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{testEmail}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/resend-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "resend-otp"]
+						},
+						"description": "Resend OTP email (rate limited to 1 request per 60 seconds)"
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Login successful with tokens', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.success).to.be.true;",
+									"    pm.expect(response.data).to.have.property('accessToken');",
+									"    pm.expect(response.data).to.have.property('refreshToken');",
+									"    pm.expect(response.data.user).to.have.property('email');",
+									"});",
+									"",
+									"pm.test('User is verified', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.data.user.isVerified).to.be.true;",
+									"});",
+									"",
+									"pm.test('Response time is acceptable', function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+									"    pm.collectionVariables.set('userId', response.data.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login with email and password (only verified users can login)"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "refresh"]
+						},
+						"description": "Get new access token using refresh token"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Get current authenticated user profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Username Availability",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/check-username?username=testuser",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "check-username"],
+							"query": [
+								{
+									"key": "username",
+									"value": "testuser",
+									"description": "Username to check"
+								}
+							]
+						},
+						"description": "Check if username is available (real-time validation)"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Email Availability",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/check-email?email=user@example.com",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "check-email"],
+							"query": [
+								{
+									"key": "email",
+									"value": "user@example.com",
+									"description": "Email to check"
+								}
+							]
+						},
+						"description": "Check if email is available (real-time validation)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update FCM Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fcmToken\": \"your-firebase-cloud-messaging-token-here\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/fcm-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "fcm-token"]
+						},
+						"description": "Update Firebase Cloud Messaging token for push notifications"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Phone Number",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+919876543210\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/phone-number",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "phone-number"]
+						},
+						"description": "Update WhatsApp phone number (E.164 format: +country_code + number)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Notification Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notifyViaPush\": true,\n  \"notifyViaWhatsApp\": true,\n  \"notifyViaEmail\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/notification-preferences",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "notification-preferences"]
+						},
+						"description": "Update multi-channel notification preferences (Push, WhatsApp, Email)"
+					},
+					"response": []
+				},
+				{
+					"name": "Test WhatsApp Notification",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/test-whatsapp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "test-whatsapp"]
+						},
+						"description": "Send a test WhatsApp message to verify integration (requires phone number to be set)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Login History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Returns login history array', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.success).to.be.true;",
+									"    pm.expect(response.data).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Login activities have required fields', function () {",
+									"    const response = pm.response.json();",
+									"    if (response.data.length > 0) {",
+									"        const activity = response.data[0];",
+									"        pm.expect(activity).to.have.property('ipAddress');",
+									"        pm.expect(activity).to.have.property('deviceInfo');",
+									"        pm.expect(activity).to.have.property('browser');",
+									"        pm.expect(activity).to.have.property('os');",
+									"        pm.expect(activity).to.have.property('loginAt');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/login-history?limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login-history"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Number of login records to return (default: 10)"
+								}
+							]
+						},
+						"description": "Get user's recent login activity with IP address, device, browser, OS, and timestamp"
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "logout"]
+						},
+						"description": "Logout user and invalidate refresh token"
+					},
+					"response": []
+				}
+			],
+			"description": "User authentication endpoints"
+		},
+		{
+			"name": "User Profile",
+			"item": [
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "profile"]
+						},
+						"description": "Get detailed user profile with linked platforms"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Updated Name\",\n  \"username\": \"newusername\",\n  \"notificationEnabled\": true,\n  \"notificationTime\": 30\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "profile"]
+						},
+						"description": "Update user profile information"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Dashboard",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "dashboard"]
+						},
+						"description": "Get user dashboard with stats overview"
+					},
+					"response": []
+				},
+				{
+					"name": "Link Platform",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"platform\": \"leetcode\",\n  \"platformUsername\": \"your_leetcode_username\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/link-platform",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "link-platform"]
+						},
+						"description": "Link a coding platform account (leetcode, codeforces, codechef, atcoder, hackerrank, hackerearth)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Linked Platforms",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/linked-platforms",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "linked-platforms"]
+						},
+						"description": "Get all linked platform accounts"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Platform Username",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"platformUsername\": \"updated_username\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/platform/leetcode",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "platform", "leetcode"]
+						},
+						"description": "Update platform username"
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Platform",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/unlink-platform/leetcode",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "unlink-platform", "leetcode"]
+						},
+						"description": "Unlink a coding platform account"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Account",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/account",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "account"]
+						},
+						"description": "Delete user account (soft delete)"
+					},
+					"response": []
+				}
+			],
+			"description": "User profile management endpoints"
+		},
+		{
+			"name": "Contests",
+			"item": [
+				{
+					"name": "Get All Contests",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/contests?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["contests"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page"
+								},
+								{
+									"key": "platform",
+									"value": "leetcode",
+									"description": "Filter by platform",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "upcoming",
+									"description": "Filter by status (upcoming, ongoing, completed)",
+									"disabled": true
+								},
+								{
+									"key": "startDate",
+									"value": "2025-11-17",
+									"description": "Filter by start date",
+									"disabled": true
+								},
+								{
+									"key": "endDate",
+									"value": "2025-12-17",
+									"description": "Filter by end date",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get all contests with optional filters"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Contest by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.id) {",
+									"        pm.collectionVariables.set('contestId', response.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/contests/{{contestId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["contests", "{{contestId}}"]
+						},
+						"description": "Get contest details by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Upcoming Contests",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/contests/upcoming?limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["contests", "upcoming"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Number of contests to return"
+								}
+							]
+						},
+						"description": "Get upcoming contests"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Contests by Platform",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/contests/platform/leetcode?limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["contests", "platform", "leetcode"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get contests for a specific platform (leetcode, codeforces, codechef, atcoder)"
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Contests (Manual)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/contests/sync",
+							"host": ["{{baseUrl}}"],
+							"path": ["contests", "sync"]
+						},
+						"description": "Manually trigger contest sync from external APIs"
+					},
+					"response": []
+				}
+			],
+			"description": "Contest management endpoints"
+		},
+		{
+			"name": "Reminders",
+			"item": [
+				{
+					"name": "Add Reminder",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.id) {",
+									"        pm.collectionVariables.set('reminderId', response.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contestId\": \"{{contestId}}\",\n  \"reminderTime\": 30\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/reminders",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders"]
+						},
+						"description": "Add a reminder for a contest (reminderTime in minutes before contest)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Reminders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reminders?page=1&limit=20&includeCompleted=false",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "includeCompleted",
+									"value": "false",
+									"description": "Include completed reminders"
+								}
+							]
+						},
+						"description": "Get all reminders for current user"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reminder by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reminders/{{reminderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders", "{{reminderId}}"]
+						},
+						"description": "Get specific reminder by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Reminder",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reminderTime\": 60\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/reminders/{{reminderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders", "{{reminderId}}"]
+						},
+						"description": "Update reminder time"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Reminder",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reminders/{{reminderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders", "{{reminderId}}"]
+						},
+						"description": "Delete a reminder"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reminder Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reminders/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["reminders", "stats"]
+						},
+						"description": "Get reminder statistics for current user"
+					},
+					"response": []
+				}
+			],
+			"description": "Reminder management endpoints"
+		},
+		{
+			"name": "Stats",
+			"item": [
+				{
+					"name": "Get Platform Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stats/leetcode",
+							"host": ["{{baseUrl}}"],
+							"path": ["stats", "leetcode"]
+						},
+						"description": "Get stats for a specific platform (leetcode, codeforces, codechef, atcoder)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All User Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["stats"]
+						},
+						"description": "Get stats for all linked platforms"
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Platform Stats",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stats/leetcode/sync",
+							"host": ["{{baseUrl}}"],
+							"path": ["stats", "leetcode", "sync"]
+						},
+						"description": "Force sync stats for a specific platform"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Stats Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/stats/summary",
+							"host": ["{{baseUrl}}"],
+							"path": ["stats", "summary"]
+						},
+						"description": "Get overall stats summary across all platforms"
+					},
+					"response": []
+				}
+			],
+			"description": "User statistics endpoints"
+		},
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "API Health",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": [""]
+						},
+						"description": "Check if API is running"
+					},
+					"response": []
+				}
+			],
+			"description": "Health check endpoint"
+		}
+	]
+}
