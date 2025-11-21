@@ -9,6 +9,7 @@ const { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } = req
 const { cacheSet, cacheDel, cacheDelPattern, cacheGet } = require('../config/redis');
 const logger = require('../utils/logger');
 const emailService = require('./emailService');
+const { addOTPEmailJob, addWelcomeEmailJob } = require('../queues/emailQueue');
 const IPUtils = require('../utils/ipUtils');
 const UserAgentParser = require('../utils/userAgentParser');
 
@@ -91,52 +92,88 @@ class AuthService {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedUsername = username.toLowerCase().trim();
 
-    // Check if user already exists (server-side validation still required)
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (existingUser) {
-      throw new ConflictError('Email already registered');
-    }
-
-    const existingUsername = await prisma.user.findUnique({
-      where: { username: normalizedUsername },
-    });
-
-    if (existingUsername) {
-      throw new ConflictError('Username already taken');
-    }
-
-    // Hash password
+    // Hash password before transaction
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Generate OTP
     const otp = generateOTP();
 
-    // Create new user (unverified)
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        username: normalizedUsername,
-        password: hashedPassword,
-        fullName,
-        authProvider: 'local',
-        isVerified: false,
-      },
-    });
+    let user;
+
+    try {
+      // Use transaction to handle race conditions atomically
+      user = await prisma.$transaction(async (tx) => {
+        // Check if user already exists
+        const existingUser = await tx.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (existingUser) {
+          // If user exists but is not verified, delete and allow re-registration
+          if (!existingUser.isVerified) {
+            await tx.user.delete({
+              where: { id: existingUser.id },
+            });
+            logger.info(`Deleted unverified account for re-registration: ${normalizedEmail}`);
+          } else {
+            throw new ConflictError('Email already registered');
+          }
+        }
+
+        const existingUsername = await tx.user.findUnique({
+          where: { username: normalizedUsername },
+        });
+
+        if (existingUsername) {
+          // If username exists but is not verified, delete and allow re-registration
+          if (!existingUsername.isVerified) {
+            await tx.user.delete({
+              where: { id: existingUsername.id },
+            });
+            logger.info(`Deleted unverified account for re-registration: ${normalizedUsername}`);
+          } else {
+            throw new ConflictError('Username already taken');
+          }
+        }
+
+        // Create new user (unverified) within the same transaction
+        return await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            username: normalizedUsername,
+            password: hashedPassword,
+            fullName,
+            authProvider: 'local',
+            isVerified: false,
+          },
+        });
+      });
+    } catch (error) {
+      // Handle Prisma unique constraint violations (race condition fallback)
+      if (error.code === 'P2002') {
+        const target = error.meta?.target;
+        if (target && target.includes('email')) {
+          throw new ConflictError('Email already registered');
+        } else if (target && target.includes('username')) {
+          throw new ConflictError('Username already taken');
+        }
+      }
+      // Re-throw if it's our custom error or unknown error
+      throw error;
+    }
 
     // Store OTP in Redis with 10-minute expiration
     const otpKey = `otp:${normalizedEmail}`;
     await cacheSet(otpKey, otp, 600); // 600 seconds = 10 minutes
 
-    // Send OTP email
-    if (emailService.isConfigured()) {
-      await emailService.sendOTPEmail(normalizedEmail, otp, username);
-      logger.info(`OTP sent to ${normalizedEmail}`);
-    } else {
-      logger.warn('Email service not configured, OTP not sent');
+    // Add OTP email to queue (non-blocking)
+    try {
+      await addOTPEmailJob(normalizedEmail, otp, username);
+      logger.info(`OTP email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue OTP email for ${normalizedEmail}:`, error);
+      // Continue with registration even if email queue fails
     }
 
     // Invalidate cache for this username and email
@@ -461,9 +498,23 @@ class AuthService {
   async verifyOTP(email, otp) {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Find user by email
+    // Find user by email (select only needed fields for faster query)
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        isVerified: true,
+        isActive: true,
+        avatar: true,
+        authProvider: true,
+        notifyViaPush: true,
+        notifyViaWhatsApp: true,
+        notifyViaEmail: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -489,25 +540,37 @@ class AuthService {
       throw new BadRequestError('Invalid OTP');
     }
 
-    // Mark user as verified
-    const verifiedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        isVerified: true,
-      },
-    });
+    // Mark user as verified and delete OTP in parallel
+    const [verifiedUser] = await Promise.all([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          isVerified: true,
+          isActive: true,
+          avatar: true,
+          authProvider: true,
+          notifyViaPush: true,
+          notifyViaWhatsApp: true,
+          notifyViaEmail: true,
+          createdAt: true,
+        },
+      }),
+      cacheDel(otpKey),
+    ]);
 
-    // Delete OTP from Redis after successful verification
-    await cacheDel(otpKey);
-
-    // Send welcome email
-    if (emailService.isConfigured()) {
-      await emailService.sendWelcomeEmail(normalizedEmail, verifiedUser.username);
-      logger.info(`Welcome email sent to ${normalizedEmail}`);
+    // Send welcome email asynchronously (non-blocking)
+    try {
+      await addWelcomeEmailJob(normalizedEmail, verifiedUser.username);
+      logger.info(`Welcome email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue welcome email for ${normalizedEmail}:`, error);
+      // Continue even if email queue fails
     }
-
-    // Remove sensitive data
-    delete verifiedUser.password;
 
     // Generate tokens
     const accessToken = generateAccessToken(verifiedUser.id);
@@ -565,12 +628,13 @@ class AuthService {
     // Set rate limit timestamp with 60-second expiration
     await cacheSet(rateLimitKey, Date.now().toString(), 60);
 
-    // Send OTP email
-    if (emailService.isConfigured()) {
-      await emailService.sendOTPEmail(normalizedEmail, otp, user.username);
-      logger.info(`OTP resent to ${normalizedEmail}`);
-    } else {
-      logger.warn('Email service not configured, OTP not sent');
+    // Add OTP email to queue (non-blocking)
+    try {
+      await addOTPEmailJob(normalizedEmail, otp, user.username);
+      logger.info(`OTP email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue OTP email for ${normalizedEmail}:`, error);
+      // Continue even if email queue fails
     }
 
     return {
