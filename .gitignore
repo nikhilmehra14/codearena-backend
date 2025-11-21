@@ -48,3 +48,5 @@ firebase-admin-key.json
 
 # PM2
 .pm2/
+
+firebase-admin-key.json
