@@ -14,15 +14,28 @@ const initializeFirebase = () => {
     }
 
     // Initialize Firebase Admin SDK
-    if (config.firebase.adminKeyPath && fs.existsSync(config.firebase.adminKeyPath)) {
-      // Using service account key file
-      const serviceAccount = require(config.firebase.adminKeyPath);
+    if (config.firebase.adminKeyPath) {
+      // Resolve absolute path
+      const path = require('path');
+      const absolutePath = path.resolve(config.firebase.adminKeyPath);
+      
+      if (fs.existsSync(absolutePath)) {
+        // Using service account key file
+        const serviceAccount = require(absolutePath);
 
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: config.firebase.projectId,
-      });
-    } else if (config.firebase.privateKey && config.firebase.clientEmail) {
+        firebaseApp = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: config.firebase.projectId,
+        });
+        
+        logger.info('✓ Firebase initialized with service account file');
+        return firebaseApp;
+      } else {
+        logger.warn(`Firebase key file not found at: ${absolutePath}`);
+      }
+    }
+    
+    if (config.firebase.privateKey && config.firebase.clientEmail) {
       // Using environment variables
       firebaseApp = admin.initializeApp({
         credential: admin.credential.cert({
@@ -31,6 +44,9 @@ const initializeFirebase = () => {
           clientEmail: config.firebase.clientEmail,
         }),
       });
+      
+      logger.info('✓ Firebase initialized with environment variables');
+      return firebaseApp;
     } else {
       logger.warn('Firebase configuration not found. Push notifications will be disabled.');
       return null;

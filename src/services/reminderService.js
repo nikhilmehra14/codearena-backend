@@ -64,19 +64,26 @@ class ReminderService {
   async getUserReminders(userId, options = {}) {
     const { includeCompleted = false, page = 1, limit = 20 } = options;
 
-    const where = { userId, isActive: true };
-
-    const contestWhere = includeCompleted ? {} : { status: { in: ['upcoming', 'ongoing'] } };
-
     const skip = (page - 1) * limit;
+
+    // Build where clause for reminders with contest filter
+    const where = {
+      userId,
+      isActive: true,
+    };
+
+    // If not including completed, filter by contest status
+    if (!includeCompleted) {
+      where.contest = {
+        status: { in: ['upcoming', 'ongoing'] },
+      };
+    }
 
     const [reminders, count] = await Promise.all([
       prisma.reminder.findMany({
         where,
         include: {
-          contest: {
-            where: contestWhere,
-          },
+          contest: true,
         },
         orderBy: {
           contest: {
@@ -87,10 +94,7 @@ class ReminderService {
         skip,
       }),
       prisma.reminder.count({
-        where: {
-          ...where,
-          contest: contestWhere,
-        },
+        where,
       }),
     ]);
 
