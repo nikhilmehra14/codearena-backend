@@ -92,41 +92,76 @@ class AuthService {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedUsername = username.toLowerCase().trim();
 
-    // Check if user already exists (server-side validation still required)
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (existingUser) {
-      throw new ConflictError('Email already registered');
-    }
-
-    const existingUsername = await prisma.user.findUnique({
-      where: { username: normalizedUsername },
-    });
-
-    if (existingUsername) {
-      throw new ConflictError('Username already taken');
-    }
-
-    // Hash password
+    // Hash password before transaction
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Generate OTP
     const otp = generateOTP();
 
-    // Create new user (unverified)
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        username: normalizedUsername,
-        password: hashedPassword,
-        fullName,
-        authProvider: 'local',
-        isVerified: false,
-      },
-    });
+    let user;
+
+    try {
+      // Use transaction to handle race conditions atomically
+      user = await prisma.$transaction(async (tx) => {
+        // Check if user already exists
+        const existingUser = await tx.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (existingUser) {
+          // If user exists but is not verified, delete and allow re-registration
+          if (!existingUser.isVerified) {
+            await tx.user.delete({
+              where: { id: existingUser.id },
+            });
+            logger.info(`Deleted unverified account for re-registration: ${normalizedEmail}`);
+          } else {
+            throw new ConflictError('Email already registered');
+          }
+        }
+
+        const existingUsername = await tx.user.findUnique({
+          where: { username: normalizedUsername },
+        });
+
+        if (existingUsername) {
+          // If username exists but is not verified, delete and allow re-registration
+          if (!existingUsername.isVerified) {
+            await tx.user.delete({
+              where: { id: existingUsername.id },
+            });
+            logger.info(`Deleted unverified account for re-registration: ${normalizedUsername}`);
+          } else {
+            throw new ConflictError('Username already taken');
+          }
+        }
+
+        // Create new user (unverified) within the same transaction
+        return await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            username: normalizedUsername,
+            password: hashedPassword,
+            fullName,
+            authProvider: 'local',
+            isVerified: false,
+          },
+        });
+      });
+    } catch (error) {
+      // Handle Prisma unique constraint violations (race condition fallback)
+      if (error.code === 'P2002') {
+        const target = error.meta?.target;
+        if (target && target.includes('email')) {
+          throw new ConflictError('Email already registered');
+        } else if (target && target.includes('username')) {
+          throw new ConflictError('Username already taken');
+        }
+      }
+      // Re-throw if it's our custom error or unknown error
+      throw error;
+    }
 
     // Store OTP in Redis with 10-minute expiration
     const otpKey = `otp:${normalizedEmail}`;
