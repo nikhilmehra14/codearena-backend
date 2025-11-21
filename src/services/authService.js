@@ -9,6 +9,7 @@ const { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } = req
 const { cacheSet, cacheDel, cacheDelPattern, cacheGet } = require('../config/redis');
 const logger = require('../utils/logger');
 const emailService = require('./emailService');
+const { addOTPEmailJob, addWelcomeEmailJob } = require('../queues/emailQueue');
 const IPUtils = require('../utils/ipUtils');
 const UserAgentParser = require('../utils/userAgentParser');
 
@@ -131,12 +132,13 @@ class AuthService {
     const otpKey = `otp:${normalizedEmail}`;
     await cacheSet(otpKey, otp, 600); // 600 seconds = 10 minutes
 
-    // Send OTP email
-    if (emailService.isConfigured()) {
-      await emailService.sendOTPEmail(normalizedEmail, otp, username);
-      logger.info(`OTP sent to ${normalizedEmail}`);
-    } else {
-      logger.warn('Email service not configured, OTP not sent');
+    // Add OTP email to queue (non-blocking)
+    try {
+      await addOTPEmailJob(normalizedEmail, otp, username);
+      logger.info(`OTP email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue OTP email for ${normalizedEmail}:`, error);
+      // Continue with registration even if email queue fails
     }
 
     // Invalidate cache for this username and email
@@ -461,9 +463,23 @@ class AuthService {
   async verifyOTP(email, otp) {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Find user by email
+    // Find user by email (select only needed fields for faster query)
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        isVerified: true,
+        isActive: true,
+        avatar: true,
+        authProvider: true,
+        notifyViaPush: true,
+        notifyViaWhatsApp: true,
+        notifyViaEmail: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -489,25 +505,37 @@ class AuthService {
       throw new BadRequestError('Invalid OTP');
     }
 
-    // Mark user as verified
-    const verifiedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        isVerified: true,
-      },
-    });
+    // Mark user as verified and delete OTP in parallel
+    const [verifiedUser] = await Promise.all([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          isVerified: true,
+          isActive: true,
+          avatar: true,
+          authProvider: true,
+          notifyViaPush: true,
+          notifyViaWhatsApp: true,
+          notifyViaEmail: true,
+          createdAt: true,
+        },
+      }),
+      cacheDel(otpKey),
+    ]);
 
-    // Delete OTP from Redis after successful verification
-    await cacheDel(otpKey);
-
-    // Send welcome email
-    if (emailService.isConfigured()) {
-      await emailService.sendWelcomeEmail(normalizedEmail, verifiedUser.username);
-      logger.info(`Welcome email sent to ${normalizedEmail}`);
+    // Send welcome email asynchronously (non-blocking)
+    try {
+      await addWelcomeEmailJob(normalizedEmail, verifiedUser.username);
+      logger.info(`Welcome email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue welcome email for ${normalizedEmail}:`, error);
+      // Continue even if email queue fails
     }
-
-    // Remove sensitive data
-    delete verifiedUser.password;
 
     // Generate tokens
     const accessToken = generateAccessToken(verifiedUser.id);
@@ -565,12 +593,13 @@ class AuthService {
     // Set rate limit timestamp with 60-second expiration
     await cacheSet(rateLimitKey, Date.now().toString(), 60);
 
-    // Send OTP email
-    if (emailService.isConfigured()) {
-      await emailService.sendOTPEmail(normalizedEmail, otp, user.username);
-      logger.info(`OTP resent to ${normalizedEmail}`);
-    } else {
-      logger.warn('Email service not configured, OTP not sent');
+    // Add OTP email to queue (non-blocking)
+    try {
+      await addOTPEmailJob(normalizedEmail, otp, user.username);
+      logger.info(`OTP email job queued for ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to queue OTP email for ${normalizedEmail}:`, error);
+      // Continue even if email queue fails
     }
 
     return {
