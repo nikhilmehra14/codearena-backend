@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('./config/passport');
 
 const config = require('./config/config');
 const logger = require('./utils/logger');
@@ -30,6 +32,24 @@ app.use(cors(config.cors));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// Session middleware (required for Passport OAuth)
+app.use(
+  session({
+    secret: config.jwt.secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.env === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Compression middleware
 app.use(compression());
