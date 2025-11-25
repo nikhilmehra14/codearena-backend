@@ -51,7 +51,8 @@
     "redis": "^4.6.11",
     "twilio": "^5.10.5",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "eslint": "^8.55.0",

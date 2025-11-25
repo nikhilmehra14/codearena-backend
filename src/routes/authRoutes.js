@@ -3,32 +3,44 @@ const router = express.Router();
 const passport = require('../config/passport');
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const { authLimiter, registerLimiter, checkLimiter } = require('../middleware/rateLimiter');
-const { validateRegister, validateLogin } = require('../validators/validators');
+const { authLimiter, registerLimiter, checkLimiter, oauthLimiter } = require('../middleware/rateLimiter');
+const { validateRequest } = require('../middleware/validateRequest');
+const {
+  registerSchema,
+  loginSchema,
+  verifyOTPSchema,
+  resendOTPSchema,
+  updatePhoneNumberSchema,
+  updateNotificationPreferencesSchema,
+  checkUsernameSchema,
+  checkEmailSchema,
+  loginHistorySchema,
+} = require('../validators/schemas');
 
 // Username/Email availability check (rate limited separately)
-router.get('/check-username', checkLimiter, authController.checkUsername);
-router.get('/check-email', checkLimiter, authController.checkEmail);
+router.get('/check-username', checkLimiter, validateRequest(checkUsernameSchema), authController.checkUsername);
+router.get('/check-email', checkLimiter, validateRequest(checkEmailSchema), authController.checkEmail);
 
 // Public routes
-router.post('/register', registerLimiter, validateRegister, authController.register);
-router.post('/login', authLimiter, validateLogin, authController.login);
+router.post('/register', registerLimiter, validateRequest(registerSchema), authController.register);
+router.post('/login', authLimiter, validateRequest(loginSchema), authController.login);
 router.post('/refresh', authController.refreshToken);
-router.post('/verify-otp', authLimiter, authController.verifyOTP);
-router.post('/resend-otp', authLimiter, authController.resendOTP);
+router.post('/verify-otp', authLimiter, validateRequest(verifyOTPSchema), authController.verifyOTP);
+router.post('/resend-otp', authLimiter, validateRequest(resendOTPSchema), authController.resendOTP);
 
 // Protected routes
 router.post('/logout', protect, authController.logout);
 router.get('/me', protect, authController.getMe);
-router.get('/login-history', protect, authController.getLoginHistory);
+router.get('/login-history', protect, validateRequest(loginHistorySchema), authController.getLoginHistory);
 router.post('/fcm-token', protect, authController.updateFCMToken);
-router.post('/phone-number', protect, authController.updatePhoneNumber);
-router.put('/notification-preferences', protect, authController.updateNotificationPreferences);
+router.post('/phone-number', protect, validateRequest(updatePhoneNumberSchema), authController.updatePhoneNumber);
+router.put('/notification-preferences', protect, validateRequest(updateNotificationPreferencesSchema), authController.updateNotificationPreferences);
 router.post('/test-whatsapp', protect, authController.testWhatsAppNotification);
 
-// OAuth routes - Google
+// OAuth routes - Google (with rate limiting)
 router.get(
   '/google',
+  oauthLimiter,
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     session: true,
@@ -44,9 +56,10 @@ router.get(
   authController.googleCallback
 );
 
-// OAuth routes - GitHub
+// OAuth routes - GitHub (with rate limiting)
 router.get(
   '/github',
+  oauthLimiter,
   passport.authenticate('github', {
     scope: ['user:email'],
     session: true,

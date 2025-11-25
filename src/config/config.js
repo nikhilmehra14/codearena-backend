@@ -162,6 +162,16 @@ module.exports = {
     },
   },
 
+  // Platform logos (centralized configuration)
+  platformLogos: {
+    leetcode: process.env.LEETCODE_LOGO_URL || 'https://leetcode.com/static/images/LeetCode_logo.png',
+    codeforces: process.env.CODEFORCES_LOGO_URL || 'https://codeforces.org/s/68553/images/codeforces-logo-with-telegram.png',
+    codechef: process.env.CODECHEF_LOGO_URL || 'https://cdn.codechef.com/images/cc-logo.svg',
+    atcoder: process.env.ATCODER_LOGO_URL || 'https://img.atcoder.jp/assets/atcoder.png',
+    hackerrank: process.env.HACKERRANK_LOGO_URL || 'https://hrcdn.net/fcore/assets/brand/logo-new-white-green-a5cb16e0ae.svg',
+    hackerearth: process.env.HACKEREARTH_LOGO_URL || 'https://static.hackerearth.com/static/hackerearth/images/logo/HE_logo.png',
+  },
+
   // WhatsApp Configuration
   whatsapp: {
     provider: process.env.WHATSAPP_PROVIDER || 'twilio',

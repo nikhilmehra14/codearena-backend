@@ -4,17 +4,13 @@ const { cacheGet, cacheSet } = require('../config/redis');
 const { NotFoundError } = require('../utils/errorHandler');
 const config = require('../config/config');
 const logger = require('../utils/logger');
+const { BATCH_SIZES } = require('../constants/database');
 
 class ContestService {
-  // Platform logo URLs
-  platformLogos = {
-    leetcode: 'https://leetcode.com/static/images/LeetCode_logo.png',
-    codeforces: 'https://codeforces.org/s/68553/images/codeforces-logo-with-telegram.png',
-    codechef: 'https://cdn.codechef.com/images/cc-logo.svg',
-    atcoder: 'https://img.atcoder.jp/assets/atcoder.png',
-    hackerrank: 'https://hrcdn.net/fcore/assets/brand/logo-new-white-green-a5cb16e0ae.svg',
-    hackerearth: 'https://static.hackerearth.com/static/hackerearth/images/logo/HE_logo.png',
-  };
+  // Use platform logos from config
+  get platformLogos() {
+    return config.platformLogos;
+  }
 
   // Platform mapping for Clist resource names to our platform enum
   platformMapping = {
@@ -374,7 +370,7 @@ class ContestService {
     }
   }
 
-  // Sync contests to database
+  // Sync contests to database with batch processing
   async syncContests() {
     try {
       const externalContests = await this.fetchContestsFromAPI();
@@ -384,63 +380,81 @@ class ContestService {
         return { synced: 0, total: 0 };
       }
 
-      let syncedCount = 0;
+      // Filter out old contests
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      
+      const contestsToSync = externalContests.filter(
+        contest => new Date(contest.startTime) >= oneDayAgo
+      );
 
-      for (const contestData of externalContests) {
-        try {
-          const platform = contestData.platform;
-          const startTime = contestData.startTime;
-          const endTime = contestData.endTime;
-
-          // Skip if start time is in the past by more than 1 day
-          const oneDayAgo = new Date();
-          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-          if (startTime < oneDayAgo) {
-            continue;
-          }
-
-          // Create or update contest
-          await prisma.contest.upsert({
-            where: {
-              externalId_platform: {
-                externalId: contestData.externalId,
-                platform,
-              },
-            },
-            update: {
-              name: contestData.name,
-              url: contestData.url,
-              startTime,
-              endTime,
-              duration: contestData.durationSeconds,
-              status: this.getContestStatus(startTime, endTime),
-            },
-            create: {
-              externalId: contestData.externalId,
-              name: contestData.name,
-              platform,
-              url: contestData.url,
-              startTime,
-              endTime,
-              duration: contestData.durationSeconds,
-              platformLogo: contestData.platformLogo,
-              status: this.getContestStatus(startTime, endTime),
-            },
-          });
-
-          syncedCount++;
-        } catch (err) {
-          logger.error(`Error syncing contest: ${contestData.name}`, err);
-        }
+      if (contestsToSync.length === 0) {
+        logger.info('No new contests to sync (all are too old)');
+        return { synced: 0, total: externalContests.length };
       }
 
-      logger.info(`Synced ${syncedCount} out of ${externalContests.length} contests`);
+      let syncedCount = 0;
+      const BATCH_SIZE = BATCH_SIZES.CONTEST_SYNC;
+
+      // Process contests in batches to avoid memory issues
+      for (let i = 0; i < contestsToSync.length; i += BATCH_SIZE) {
+        const batch = contestsToSync.slice(i, i + BATCH_SIZE);
+        
+        // Process batch with Promise.allSettled to handle individual failures
+        const results = await Promise.allSettled(
+          batch.map(async (contestData) => {
+            const platform = contestData.platform;
+            const startTime = contestData.startTime;
+            const endTime = contestData.endTime;
+
+            return await prisma.contest.upsert({
+              where: {
+                externalId_platform: {
+                  externalId: contestData.externalId,
+                  platform,
+                },
+              },
+              update: {
+                name: contestData.name,
+                url: contestData.url,
+                startTime,
+                endTime,
+                duration: contestData.durationSeconds,
+                status: this.getContestStatus(startTime, endTime),
+              },
+              create: {
+                externalId: contestData.externalId,
+                name: contestData.name,
+                platform,
+                url: contestData.url,
+                startTime,
+                endTime,
+                duration: contestData.durationSeconds,
+                platformLogo: contestData.platformLogo,
+                status: this.getContestStatus(startTime, endTime),
+              },
+            });
+          })
+        );
+
+        // Count successful syncs
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            syncedCount++;
+          } else {
+            logger.error(`Error syncing contest in batch ${i}-${i+BATCH_SIZE}: ${batch[index].name}`, result.reason);
+          }
+        });
+
+        logger.debug(`Processed batch ${i / BATCH_SIZE + 1}: ${results.filter(r => r.status === 'fulfilled').length}/${batch.length} successful`);
+      }
+
+      logger.info(`Synced ${syncedCount} out of ${contestsToSync.length} contests (total fetched: ${externalContests.length})`);
 
       // Clear cache
       await cacheSet('contests:synced', Date.now(), 3600);
 
-      return { synced: syncedCount, total: externalContests.length };
+      return { synced: syncedCount, total: externalContests.length, processed: contestsToSync.length };
     } catch (error) {
       logger.error('Error syncing contests:', error);
       throw error;

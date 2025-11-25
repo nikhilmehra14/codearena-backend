@@ -15,6 +15,7 @@ const { connectRedis } = require('./config/redis');
 const { initializeFirebase } = require('./config/firebase');
 const { handleError } = require('./utils/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
+const { requestId } = require('./middleware/requestId');
 const routes = require('./routes');
 const cronJobs = require('./utils/cronJobs');
 
@@ -23,6 +24,9 @@ const app = express();
 
 // Trust proxy
 app.set('trust proxy', 1);
+
+// Request ID middleware (should be first)
+app.use(requestId);
 
 // Security middleware
 app.use(helmet());

@@ -110,10 +110,29 @@ const cacheDelPattern = async (pattern) => {
   try {
     const client = getRedisClient();
     if (!client) return false; // Redis not available
-    const keys = await client.keys(pattern);
-    if (keys.length > 0) {
-      await client.del(keys);
+    
+    // Use SCAN instead of KEYS for better performance
+    let cursor = '0';
+    let deletedCount = 0;
+    
+    do {
+      const reply = await client.scan(cursor, {
+        MATCH: pattern,
+        COUNT: 100,
+      });
+      
+      cursor = reply.cursor;
+      
+      if (reply.keys && reply.keys.length > 0) {
+        await client.del(reply.keys);
+        deletedCount += reply.keys.length;
+      }
+    } while (cursor !== '0');
+    
+    if (deletedCount > 0) {
+      logger.debug(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
     }
+    
     return true;
   } catch (error) {
     logger.error(`Cache delete pattern error for ${pattern}:`, error);
