@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const passport = require('../config/passport');
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { authLimiter, registerLimiter, checkLimiter } = require('../middleware/rateLimiter');
@@ -25,10 +26,40 @@ router.post('/phone-number', protect, authController.updatePhoneNumber);
 router.put('/notification-preferences', protect, authController.updateNotificationPreferences);
 router.post('/test-whatsapp', protect, authController.testWhatsAppNotification);
 
-// OAuth routes (will be configured with Passport in server.js)
-// router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-// router.get('/google/callback', passport.authenticate('google'), authController.googleCallback);
-// router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
-// router.get('/github/callback', passport.authenticate('github'), authController.githubCallback);
+// OAuth routes - Google
+router.get(
+  '/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: true,
+  })
+);
+
+router.get(
+  '/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed`,
+    session: true,
+  }),
+  authController.googleCallback
+);
+
+// OAuth routes - GitHub
+router.get(
+  '/github',
+  passport.authenticate('github', {
+    scope: ['user:email'],
+    session: true,
+  })
+);
+
+router.get(
+  '/github/callback',
+  passport.authenticate('github', {
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed`,
+    session: true,
+  }),
+  authController.githubCallback
+);
 
 module.exports = router;
