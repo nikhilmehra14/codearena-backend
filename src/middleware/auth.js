@@ -3,6 +3,8 @@ const { prisma } = require('../config/database');
 const { UnauthorizedError } = require('../utils/errorHandler');
 const { asyncHandler } = require('../utils/errorHandler');
 const config = require('../config/config');
+const { USER_SELECT_FIELDS } = require('../constants/database');
+const ERROR_MESSAGES = require('../constants/errors');
 
 // Generate Access Token
 const generateAccessToken = (userId) => {
@@ -47,44 +49,27 @@ const protect = asyncHandler(async (req, res, next) => {
 
   // Check if token exists
   if (!token) {
-    throw new UnauthorizedError('Not authorized to access this route');
+    throw new UnauthorizedError(ERROR_MESSAGES.AUTH.NO_TOKEN);
   }
 
   try {
     // Verify token
     const decoded = verifyAccessToken(token);
 
-    // Get user from token
+    // Get user from token using centralized select fields
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        fullName: true,
-        avatar: true,
-        authProvider: true,
-        isVerified: true,
-        notificationEnabled: true,
-        notificationTime: true,
-        darkMode: true,
-        timezone: true,
-        fcmToken: true,
-        lastLogin: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: USER_SELECT_FIELDS,
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedError('User not found or inactive');
+      throw new UnauthorizedError(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
     }
 
     req.user = user;
     next();
   } catch (error) {
-    throw new UnauthorizedError('Not authorized to access this route');
+    throw new UnauthorizedError(ERROR_MESSAGES.AUTH.UNAUTHORIZED);
   }
 });
 
@@ -101,24 +86,7 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
       const decoded = verifyAccessToken(token);
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          fullName: true,
-          avatar: true,
-          authProvider: true,
-          isVerified: true,
-          notificationEnabled: true,
-          notificationTime: true,
-          darkMode: true,
-          timezone: true,
-          fcmToken: true,
-          lastLogin: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: USER_SELECT_FIELDS,
       });
 
       if (user && user.isActive) {
@@ -132,6 +100,16 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   next();
 });
 
+// Admin middleware - Requires admin role (placeholder for future implementation)
+const requireAdmin = asyncHandler(async (req, res, next) => {
+  // TODO: Implement role-based access control
+  // For now, just check if user is authenticated
+  if (!req.user) {
+    throw new UnauthorizedError(ERROR_MESSAGES.AUTH.ADMIN_REQUIRED);
+  }
+  next();
+});
+
 module.exports = {
   generateAccessToken,
   generateRefreshToken,
@@ -139,4 +117,5 @@ module.exports = {
   verifyRefreshToken,
   protect,
   optionalAuth,
+  requireAdmin,
 };

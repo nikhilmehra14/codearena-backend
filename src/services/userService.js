@@ -123,7 +123,7 @@ class UserService {
     return linkedPlatform;
   }
 
-  // Unlink platform account
+  // Unlink platform account (with transaction)
   async unlinkPlatform(userId, platform) {
     const linkedPlatform = await prisma.linkedPlatform.findUnique({
       where: {
@@ -138,22 +138,23 @@ class UserService {
       throw new NotFoundError('Platform not linked');
     }
 
-    await prisma.linkedPlatform.delete({
-      where: {
-        userId_platform: {
+    // Use transaction to ensure atomicity
+    await prisma.$transaction([
+      prisma.linkedPlatform.delete({
+        where: {
+          userId_platform: {
+            userId,
+            platform,
+          },
+        },
+      }),
+      prisma.userStats.deleteMany({
+        where: {
           userId,
           platform,
         },
-      },
-    });
-
-    // Also delete associated stats
-    await prisma.userStats.deleteMany({
-      where: {
-        userId,
-        platform,
-      },
-    });
+      }),
+    ]);
 
     // Clear cache
     await cacheDel(`user:${userId}`);
@@ -216,7 +217,7 @@ class UserService {
     return updatedPlatform;
   }
 
-  // Delete user account
+  // Delete user account (soft delete with transaction)
   async deleteAccount(userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -226,11 +227,17 @@ class UserService {
       throw new NotFoundError('User not found');
     }
 
-    // Soft delete - deactivate account
-    await prisma.user.update({
-      where: { id: userId },
-      data: { isActive: false },
-    });
+    // Soft delete - deactivate account and related data atomically
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      }),
+      prisma.reminder.updateMany({
+        where: { userId },
+        data: { isActive: false },
+      }),
+    ]);
 
     // Clear cache
     await cacheDel(`user:${userId}`);

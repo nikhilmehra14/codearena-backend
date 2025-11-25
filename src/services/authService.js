@@ -284,7 +284,7 @@ class AuthService {
     // Create new user if doesn't exist
     if (!user) {
       const username = email?.split('@')[0] || `${provider}_${providerId}`;
-      
+
       user = await prisma.user.create({
         data: {
           email: email || `${providerId}@${provider}.oauth`,
@@ -495,7 +495,7 @@ class AuthService {
   }
 
   // Verify OTP
-  async verifyOTP(email, otp) {
+  async verifyOTP(email, otp, ip = null, userAgent = null) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Find user by email (select only needed fields for faster query)
@@ -540,11 +540,14 @@ class AuthService {
       throw new BadRequestError('Invalid OTP');
     }
 
-    // Mark user as verified and delete OTP in parallel
+    // Mark user as verified, update lastLogin, and delete OTP in parallel
     const [verifiedUser] = await Promise.all([
       prisma.user.update({
         where: { id: user.id },
-        data: { isVerified: true },
+        data: {
+          isVerified: true,
+          lastLogin: new Date(),
+        },
         select: {
           id: true,
           email: true,
@@ -576,8 +579,11 @@ class AuthService {
     const accessToken = generateAccessToken(verifiedUser.id);
     const refreshToken = generateRefreshToken(verifiedUser.id);
 
-    // Save refresh token
-    await this.saveRefreshToken(verifiedUser.id, refreshToken);
+    // Save refresh token with device info
+    await this.saveRefreshToken(verifiedUser.id, refreshToken, userAgent);
+
+    // Track login activity for OTP verification
+    await this.trackLoginActivity(verifiedUser.id, ip, userAgent);
 
     logger.info(`User email verified: ${normalizedEmail}`);
 

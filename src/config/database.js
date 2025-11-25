@@ -1,21 +1,17 @@
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 
+// Configure Prisma logging based on environment
+const prismaLogConfig = process.env.NODE_ENV === 'production'
+  ? ['error', 'warn']
+  : [
+      { emit: 'event', level: 'query' },
+      { emit: 'event', level: 'error' },
+      { emit: 'event', level: 'warn' },
+    ];
+
 const prisma = new PrismaClient({
-  log: [
-    {
-      emit: 'event',
-      level: 'query',
-    },
-    {
-      emit: 'event',
-      level: 'error',
-    },
-    {
-      emit: 'event',
-      level: 'warn',
-    },
-  ],
+  log: prismaLogConfig,
 });
 
 // Log queries in development

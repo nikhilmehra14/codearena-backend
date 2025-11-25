@@ -90,6 +90,8 @@ model Contest {
   @@index([platform])
   @@index([startTime])
   @@index([status])
+  @@index([status, endTime])  // Compound index for status updates
+  @@index([platform, status, startTime])  // Compound index for platform-specific queries
   @@map("contests")
 }
 
@@ -113,6 +115,8 @@ model Reminder {
   @@index([contestId])
   @@index([notificationSent])
   @@index([scheduledTime])
+  @@index([userId, isActive])  // Compound index for user's active reminders
+  @@index([notificationSent, isActive, scheduledTime])  // Compound index for pending notifications
   @@map("reminders")
 }
 

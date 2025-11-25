@@ -1,6 +1,7 @@
 const userService = require('../services/userService');
 const { asyncHandler } = require('../utils/errorHandler');
 const { successResponse } = require('../utils/response');
+const { HttpStatus } = require('../constants/httpStatus');
 
 // @desc    Get user profile
 // @route   GET /api/v1/users/profile
@@ -26,7 +27,7 @@ const linkPlatform = asyncHandler(async (req, res) => {
 
   const linkedPlatform = await userService.linkPlatform(req.user.id, platform, platformUsername);
 
-  res.status(201).json({
+  res.status(HttpStatus.CREATED.code).json({
     success: true,
     message: 'Platform linked successfully',
     data: linkedPlatform,
