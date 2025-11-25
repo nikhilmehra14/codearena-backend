@@ -19,6 +19,23 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   successResponse(res, user, 'User profile updated successfully');
 });
 
+// @desc    Upload user avatar
+// @route   POST /api/v1/users/avatar
+// @access  Private
+const uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new BadRequestError('Please upload a file');
+  }
+
+  const avatarUrl = req.file.path;
+
+  const user = await userService.updateUserProfile(req.user.id, {
+    avatar: avatarUrl,
+  });
+
+  successResponse(res, { avatar: avatarUrl }, 'Avatar uploaded successfully');
+});
+
 // @desc    Link platform account
 // @route   POST /api/v1/users/link-platform
 // @access  Private
@@ -84,6 +101,7 @@ const getUserDashboard = asyncHandler(async (req, res) => {
 module.exports = {
   getUserProfile,
   updateUserProfile,
+  uploadAvatar,
   linkPlatform,
   unlinkPlatform,
   getLinkedPlatforms,
