@@ -79,6 +79,21 @@ const resendOTPSchema = z.object({
   }),
 });
 
+const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: emailSchema,
+  }),
+});
+
+const resetPasswordSchema = z.object({
+  params: z.object({
+    token: z.string().min(1, 'Reset token is required'),
+  }),
+  body: z.object({
+    password: passwordSchema,
+  }),
+});
+
 const updatePhoneNumberSchema = z.object({
   body: z.object({
     phoneNumber: phoneNumberSchema.refine(val => val !== undefined, {
@@ -228,6 +243,8 @@ module.exports = {
   loginSchema,
   verifyOTPSchema,
   resendOTPSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   updatePhoneNumberSchema,
   updateNotificationPreferencesSchema,
   checkUsernameSchema,

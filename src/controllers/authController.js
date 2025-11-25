@@ -327,6 +327,35 @@ const resendOTP = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Forgot Password - Request password reset
+// @route   POST /api/v1/auth/forgot-password
+// @access  Public
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const result = await authService.forgotPassword(email);
+
+  res.status(HttpStatus.OK.code).json({
+    success: true,
+    message: result.message,
+  });
+});
+
+// @desc    Reset Password - Set new password with token
+// @route   POST /api/v1/auth/reset-password/:token
+// @access  Public
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const result = await authService.resetPassword(token, password);
+
+  res.status(HttpStatus.OK.code).json({
+    success: true,
+    message: result.message,
+  });
+});
+
 // @desc    Get login history
 // @route   GET /api/v1/auth/login-history
 // @access  Private
@@ -359,5 +388,7 @@ module.exports = {
   testWhatsAppNotification,
   verifyOTP,
   resendOTP,
+  forgotPassword,
+  resetPassword,
   getLoginHistory,
 };
