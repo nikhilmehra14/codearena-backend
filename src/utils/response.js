@@ -1,3 +1,5 @@
+const { HttpStatus } = require('../constants/httpStatus');
+
 const successResponse = (res, data, message = 'Success', statusCode = 200) => {
   return res.status(statusCode).json({
     success: true,
@@ -20,7 +22,7 @@ const errorResponse = (res, message = 'Error', statusCode = 500, errors = null) 
 };
 
 const paginatedResponse = (res, data, page, limit, total, message = 'Success') => {
-  return res.status(200).json({
+  return res.status(HttpStatus.OK.code).json({
     success: true,
     message,
     data,

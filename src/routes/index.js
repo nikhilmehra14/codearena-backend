@@ -3,6 +3,7 @@ const router = express.Router();
 const { prisma } = require('../config/database');
 const { getRedisClient } = require('../config/redis');
 const logger = require('../utils/logger');
+const { HttpStatus } = require('../constants/httpStatus');
 
 const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
@@ -48,8 +49,8 @@ router.get('/health', async (req, res) => {
   }
 
   // Set appropriate status code
-  const statusCode = health.success ? 200 : 503;
-  
+  const statusCode = health.success ? HttpStatus.OK.code : HttpStatus.SERVICE_UNAVAILABLE.code;
+
   res.status(statusCode).json(health);
 });
 

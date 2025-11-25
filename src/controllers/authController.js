@@ -2,6 +2,7 @@ const authService = require('../services/authService');
 const { asyncHandler } = require('../utils/errorHandler');
 const { successResponse } = require('../utils/response');
 const IPUtils = require('../utils/ipUtils');
+const { HttpStatus } = require('../constants/httpStatus');
 
 // @desc    Check username availability
 // @route   GET /api/v1/auth/check-username
@@ -10,14 +11,14 @@ const checkUsername = asyncHandler(async (req, res) => {
   const { username } = req.query;
 
   if (!username || username.length < 3) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Username must be at least 3 characters',
     });
   }
 
   if (username.length > 20) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Username must be less than 20 characters',
     });
@@ -25,7 +26,7 @@ const checkUsername = asyncHandler(async (req, res) => {
 
   // Validate username format (alphanumeric + underscore only)
   if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Username can only contain letters, numbers, and underscores',
     });
@@ -33,7 +34,7 @@ const checkUsername = asyncHandler(async (req, res) => {
 
   const available = await authService.checkUsernameAvailability(username);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     data: {
       username,
@@ -50,7 +51,7 @@ const checkEmail = asyncHandler(async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Email is required',
     });
@@ -59,7 +60,7 @@ const checkEmail = asyncHandler(async (req, res) => {
   // Basic email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Invalid email format',
     });
@@ -67,7 +68,7 @@ const checkEmail = asyncHandler(async (req, res) => {
 
   const available = await authService.checkEmailAvailability(email);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     data: {
       email,
@@ -83,7 +84,7 @@ const checkEmail = asyncHandler(async (req, res) => {
 const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.body);
 
-  res.status(201).json({
+  res.status(HttpStatus.CREATED.code).json({
     success: true,
     message: result.message,
     data: {
@@ -98,16 +99,16 @@ const register = asyncHandler(async (req, res) => {
 // @access  Public
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  
+
   // Extract IP address
   const ip = IPUtils.extractIP(req);
-  
+
   // Extract user agent
   const userAgent = req.headers['user-agent'];
 
   const { user, accessToken, refreshToken } = await authService.login(email, password, ip, userAgent);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'Login successful',
     data: {
@@ -125,7 +126,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Refresh token is required',
     });
@@ -161,7 +162,7 @@ const updateFCMToken = asyncHandler(async (req, res) => {
   const { fcmToken } = req.body;
 
   if (!fcmToken) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'FCM token is required',
     });
@@ -225,7 +226,7 @@ const updatePhoneNumber = asyncHandler(async (req, res) => {
 
   const updatedUser = await authService.updatePhoneNumber(userId, formattedPhone);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'Phone number updated successfully',
     data: updatedUser,
@@ -243,7 +244,7 @@ const updateNotificationPreferences = asyncHandler(async (req, res) => {
     notifyViaEmail,
   });
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'Notification preferences updated successfully',
     data: updatedUser,
@@ -268,7 +269,7 @@ const testWhatsAppNotification = asyncHandler(async (req, res) => {
 
   const result = await whatsappService.sendTestMessage(user.phoneNumber);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'Test WhatsApp message sent successfully',
     data: result,
@@ -282,15 +283,19 @@ const verifyOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Email and OTP are required',
     });
   }
 
-  const result = await authService.verifyOTP(email, otp);
+  // Extract IP address and user agent for activity tracking
+  const ip = IPUtils.extractIP(req);
+  const userAgent = req.headers['user-agent'];
 
-  res.status(200).json({
+  const result = await authService.verifyOTP(email, otp, ip, userAgent);
+
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: result.message,
     data: {
@@ -308,7 +313,7 @@ const resendOTP = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res.status(400).json({
+    return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Email is required',
     });
@@ -316,7 +321,7 @@ const resendOTP = asyncHandler(async (req, res) => {
 
   const result = await authService.resendOTP(email);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: result.message,
   });
@@ -331,7 +336,7 @@ const getLoginHistory = asyncHandler(async (req, res) => {
 
   const activities = await authService.getLoginHistory(userId, limit);
 
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'Login history retrieved successfully',
     data: activities,

@@ -18,6 +18,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const { requestId } = require('./middleware/requestId');
 const routes = require('./routes');
 const cronJobs = require('./utils/cronJobs');
+const { HttpStatus } = require('./constants/httpStatus');
 
 // Create Express app
 const app = express();
@@ -73,7 +74,7 @@ app.use(`/api/${config.apiVersion}`, routes);
 
 // Root route
 app.get('/', (req, res) => {
-  res.status(200).json({
+  res.status(HttpStatus.OK.code).json({
     success: true,
     message: 'CodeArena Backend API',
     version: config.apiVersion,
@@ -83,7 +84,7 @@ app.get('/', (req, res) => {
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
+  res.status(HttpStatus.NOT_FOUND.code).json({
     success: false,
     message: 'Route not found',
   });
@@ -152,7 +153,7 @@ const startServer = async () => {
       logger.info(`${signal} signal received: closing HTTP server`);
       server.close(async () => {
         logger.info('HTTP server closed');
-        
+
         // Close database connection
         try {
           const { disconnectDatabase } = require('./config/database');
@@ -160,7 +161,7 @@ const startServer = async () => {
         } catch (error) {
           logger.error('Error closing database:', error);
         }
-        
+
         // Close Redis connection
         try {
           const { closeRedis } = require('./config/redis');
@@ -168,10 +169,10 @@ const startServer = async () => {
         } catch (error) {
           logger.error('Error closing Redis:', error);
         }
-        
+
         process.exit(0);
       });
-      
+
       // Force close after 10 seconds
       setTimeout(() => {
         logger.error('Forced shutdown after timeout');
@@ -181,13 +182,13 @@ const startServer = async () => {
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    
+
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
       logger.error('Uncaught Exception:', error);
       gracefulShutdown('UNCAUGHT_EXCEPTION');
     });
-    
+
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('Unhandled Rejection at:', promise, 'reason:', reason);

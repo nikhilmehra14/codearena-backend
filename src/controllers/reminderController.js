@@ -1,6 +1,7 @@
 const reminderService = require('../services/reminderService');
 const { asyncHandler } = require('../utils/errorHandler');
 const { successResponse, paginatedResponse } = require('../utils/response');
+const { HttpStatus } = require('../constants/httpStatus');
 
 // @desc    Add reminder
 // @route   POST /api/v1/reminders
@@ -14,7 +15,7 @@ const addReminder = asyncHandler(async (req, res) => {
 
   const reminder = await reminderService.addReminder(userId, contestId, time);
 
-  res.status(201).json({
+  res.status(HttpStatus.CREATED.code).json({
     success: true,
     message: 'Reminder added successfully',
     data: reminder,
