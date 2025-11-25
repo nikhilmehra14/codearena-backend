@@ -104,7 +104,9 @@ module.exports = {
 
   // CORS Configuration
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',').map(url => url.trim()) || [],
+    origin: process.env.CORS_ORIGIN === '*'
+      ? true
+      : (process.env.CORS_ORIGIN?.split(',').map(url => url.trim()) || []),
     credentials: true,
   },
 
