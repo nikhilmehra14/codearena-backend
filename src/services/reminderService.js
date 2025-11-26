@@ -4,7 +4,7 @@ const { cacheDelPattern } = require('../config/redis');
 const logger = require('../utils/logger');
 
 class ReminderService {
-  // Add reminder
+  // Add reminder (synchronous - for backward compatibility)
   async addReminder(userId, contestId, reminderTime) {
     // Check if contest exists
     const contest = await prisma.contest.findUnique({
@@ -52,12 +52,62 @@ class ReminderService {
       },
     });
 
-    // Clear user's reminder cache
-    await cacheDelPattern(`reminders:user:${userId}*`);
+    // FIX: Fire-and-forget cache invalidation (don't await)
+    // This prevents blocking the response if Redis is slow or unavailable
+    cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
+      logger.error(`Cache invalidation failed for user ${userId}:`, err);
+      // Don't throw - cache invalidation failure shouldn't fail the request
+    });
 
     logger.info(`Reminder created for user ${userId}, contest ${contestId}`);
 
     return reminder;
+  }
+
+  // Add reminder async (queued - for high-scale operations)
+  async addReminderAsync(userId, contestId, reminderTime) {
+    // Import here to avoid circular dependency
+    const { addReminderJob } = require('../queues/reminderQueue');
+    
+    // Quick validation before queuing
+    const contest = await prisma.contest.findUnique({
+      where: { id: contestId },
+      select: { id: true, status: true },
+    });
+
+    if (!contest) {
+      throw new NotFoundError('Contest not found');
+    }
+
+    if (contest.status === 'completed') {
+      throw new ConflictError('Cannot set reminder for completed contests');
+    }
+
+    // Check if reminder already exists
+    const existingReminder = await prisma.reminder.findUnique({
+      where: {
+        userId_contestId: {
+          userId,
+          contestId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingReminder) {
+      throw new ConflictError('Reminder already exists for this contest');
+    }
+
+    // Queue the reminder creation
+    const job = await addReminderJob(userId, contestId, reminderTime);
+
+    logger.info(`Reminder job ${job.id} queued for user ${userId}, contest ${contestId}`);
+
+    return {
+      jobId: job.id,
+      status: 'queued',
+      message: 'Reminder is being created',
+    };
   }
 
   // Get user's reminders
@@ -159,7 +209,10 @@ class ReminderService {
       });
 
       // Clear cache
-      await cacheDelPattern(`reminders:user:${userId}*`);
+      // Fire-and-forget cache invalidation
+      cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
+        logger.error(`Cache invalidation failed for user ${userId}:`, err);
+      });
 
       logger.info(`Reminder ${reminderId} updated for user ${userId}`);
 
@@ -186,8 +239,10 @@ class ReminderService {
       where: { id: reminderId },
     });
 
-    // Clear cache
-    await cacheDelPattern(`reminders:user:${userId}*`);
+    // Fire-and-forget cache invalidation
+    cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
+      logger.error(`Cache invalidation failed for user ${userId}:`, err);
+    });
 
     logger.info(`Reminder ${reminderId} deleted for user ${userId}`);
 
