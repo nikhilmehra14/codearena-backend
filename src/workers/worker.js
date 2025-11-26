@@ -1,10 +1,12 @@
 const { emailQueue, closeQueue: closeEmailQueue } = require('../queues/emailQueue');
 const { notificationQueue, closeNotificationQueue } = require('../queues/notificationQueue');
+const { reminderQueue, closeReminderQueue } = require('../queues/reminderQueue');
 const logger = require('../utils/logger');
 
 logger.info('🚀 Worker process started');
 logger.info('📧 Email worker listening...');
 logger.info('🔔 Notification worker listening (Concurrency: 50)...');
+logger.info('⏰ Reminder worker listening (Concurrency: 100)...');
 
 // Handle graceful shutdown
 const shutdown = async (signal) => {
@@ -13,6 +15,7 @@ const shutdown = async (signal) => {
     await Promise.all([
       closeEmailQueue(),
       closeNotificationQueue(),
+      closeReminderQueue(),
     ]);
     logger.info('All workers shutdown complete');
     process.exit(0);

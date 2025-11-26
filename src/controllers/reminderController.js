@@ -7,12 +7,24 @@ const { HttpStatus } = require('../constants/httpStatus');
 // @route   POST /api/v1/reminders
 // @access  Private
 const addReminder = asyncHandler(async (req, res) => {
-  const { contestId, reminderTime } = req.body;
+  const { contestId, reminderTime, async = false } = req.body;
   const userId = req.user.id;
 
   // Use user's default reminder time if not provided
   const time = reminderTime || req.user.notificationTime || 30;
 
+  // Use async queue for high-scale operations
+  if (async === true) {
+    const result = await reminderService.addReminderAsync(userId, contestId, time);
+    
+    return res.status(HttpStatus.ACCEPTED.code).json({
+      success: true,
+      message: 'Reminder is being created',
+      data: result,
+    });
+  }
+
+  // Synchronous mode (default for backward compatibility)
   const reminder = await reminderService.addReminder(userId, contestId, time);
 
   res.status(HttpStatus.CREATED.code).json({
@@ -81,6 +93,23 @@ const getReminderStats = asyncHandler(async (req, res) => {
   successResponse(res, stats, 'Reminder statistics retrieved successfully');
 });
 
+// @desc    Get reminder job status
+// @route   GET /api/v1/reminders/jobs/:jobId
+// @access  Private
+const getJobStatus = asyncHandler(async (req, res) => {
+  const { getJobStatus: getStatus } = require('../queues/reminderQueue');
+  const status = await getStatus(req.params.jobId);
+  
+  if (!status) {
+    return res.status(HttpStatus.NOT_FOUND.code).json({
+      success: false,
+      message: 'Job not found',
+    });
+  }
+  
+  successResponse(res, status, 'Job status retrieved successfully');
+});
+
 module.exports = {
   addReminder,
   getUserReminders,
@@ -88,4 +117,5 @@ module.exports = {
   updateReminder,
   deleteReminder,
   getReminderStats,
+  getJobStatus,
 };
