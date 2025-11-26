@@ -209,26 +209,26 @@ class NotificationService {
 
       const results = {
         total: pendingReminders.length,
-        success: 0,
+        queued: 0,
         failed: 0,
       };
 
-      for (const reminder of pendingReminders) {
-        const result = await this.sendContestReminder(reminder);
+      // Import here to avoid circular dependency issues
+      const { addReminderJob } = require('../queues/notificationQueue');
 
-        if (result.success) {
-          results.success++;
-        } else {
+      for (const reminder of pendingReminders) {
+        try {
+          await addReminderJob(reminder);
+          results.queued++;
+        } catch (error) {
+          logger.error(`Failed to queue reminder ${reminder.id}:`, error);
           results.failed++;
         }
-
-        // Add small delay to avoid overwhelming FCM
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
       // Only log summary if reminders were processed
       if (pendingReminders.length > 0) {
-        logger.info(`Reminder processing complete. Success: ${results.success}, Failed: ${results.failed}`);
+        logger.info(`Reminder queuing complete. Queued: ${results.queued}, Failed: ${results.failed}`);
       }
 
       return results;

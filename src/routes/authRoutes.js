@@ -10,6 +10,8 @@ const {
   loginSchema,
   verifyOTPSchema,
   resendOTPSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   updatePhoneNumberSchema,
   updateNotificationPreferencesSchema,
   checkUsernameSchema,
@@ -27,6 +29,8 @@ router.post('/login', authLimiter, validateRequest(loginSchema), authController.
 router.post('/refresh', authController.refreshToken);
 router.post('/verify-otp', authLimiter, validateRequest(verifyOTPSchema), authController.verifyOTP);
 router.post('/resend-otp', authLimiter, validateRequest(resendOTPSchema), authController.resendOTP);
+router.post('/forgot-password', authLimiter, validateRequest(forgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password/:token', authLimiter, validateRequest(resetPasswordSchema), authController.resetPassword);
 
 // Protected routes
 router.post('/logout', protect, authController.logout);

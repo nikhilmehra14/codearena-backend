@@ -648,6 +648,145 @@ class AuthService {
     };
   }
 
+  // Forgot Password - Send reset token via email
+  async forgotPassword(email) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        authProvider: true,
+      },
+    });
+
+    // Always return success message for security (don't reveal if email exists)
+    if (!user) {
+      logger.info(`Password reset requested for non-existent email: ${normalizedEmail}`);
+      return {
+        message: 'If an account with this email exists, a password reset link has been sent.',
+      };
+    }
+
+    // Check if account uses OAuth (no password)
+    if (user.authProvider !== 'local') {
+      logger.info(`Password reset requested for OAuth account: ${normalizedEmail}`);
+      return {
+        message: 'If an account with this email exists, a password reset link has been sent.',
+      };
+    }
+
+    // Rate limiting: Check if reset was sent recently (within 2 minutes)
+    const rateLimitKey = `password-reset:ratelimit:${normalizedEmail}`;
+    const lastSent = await cacheGet(rateLimitKey);
+
+    if (lastSent) {
+      const waitTime = 120 - Math.floor((Date.now() - parseInt(lastSent)) / 1000);
+      if (waitTime > 0) {
+        throw new BadRequestError(`Please wait ${waitTime} seconds before requesting another password reset`);
+      }
+    }
+
+    // Generate crypto-secure random token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash token for storage
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Store hashed token in Redis with 1-hour expiration
+    const tokenKey = `password-reset:${hashedToken}`;
+    await cacheSet(tokenKey, JSON.stringify({ userId: user.id, email: normalizedEmail }), 3600); // 1 hour
+
+    // Set rate limit timestamp with 2-minute expiration
+    await cacheSet(rateLimitKey, Date.now().toString(), 120);
+
+    // Send password reset email
+    try {
+      await emailService.sendPasswordResetEmail(normalizedEmail, resetToken, user.username);
+
+      logger.info(`Password reset email sent to ${normalizedEmail}`);
+    } catch (error) {
+      logger.error(`Failed to send password reset email to ${normalizedEmail}:`, error);
+      // Continue even if email fails - don't expose this to user
+    }
+
+    return {
+      message: 'If an account with this email exists, a password reset link has been sent.',
+    };
+  }
+
+  // Reset Password - Verify token and update password
+  async resetPassword(token, newPassword) {
+    const crypto = require('crypto');
+
+    // Hash the provided token
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Get token data from Redis
+    const tokenKey = `password-reset:${hashedToken}`;
+    const tokenData = await cacheGet(tokenKey);
+
+    if (!tokenData) {
+      throw new BadRequestError('Invalid or expired reset token');
+    }
+
+    const { userId, email } = JSON.parse(tokenData);
+
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Check if account uses OAuth
+    if (user.authProvider !== 'local') {
+      throw new BadRequestError('Cannot reset password for OAuth accounts');
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password and invalidate all refresh tokens
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          password: hashedPassword,
+          updatedAt: new Date(),
+        },
+      }),
+      // Revoke all existing refresh tokens for security
+      prisma.refreshToken.updateMany({
+        where: { userId },
+        data: { isRevoked: true },
+      }),
+    ]);
+
+    // Delete the used token
+    await cacheDel(tokenKey);
+
+    // Clear any password reset rate limits
+    await cacheDel(`password-reset:ratelimit:${email}`);
+
+    // Clear user cache
+    await cacheDel(`user:${userId}`);
+
+    logger.info(`Password reset successful for user: ${email}`);
+
+    return {
+      message: 'Password has been reset successfully. Please login with your new password.',
+    };
+  }
+
   // Track login activity
   async trackLoginActivity(userId, ip, userAgent) {
     try {

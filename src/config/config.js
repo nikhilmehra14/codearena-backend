@@ -135,8 +135,6 @@ module.exports = {
   },
 
   // External APIs
-  // Note: These are public API endpoints from third-party platforms
-  // They are not hardcoded URLs for YOUR application, but external service URLs
   externalAPIs: {
     kontests: process.env.KONTESTS_API_URL || 'https://kontests.net/api/v1/all',
     clist: {
@@ -170,6 +168,13 @@ module.exports = {
     atcoder: process.env.ATCODER_LOGO_URL || 'https://img.atcoder.jp/assets/atcoder.png',
     hackerrank: process.env.HACKERRANK_LOGO_URL || 'https://hrcdn.net/fcore/assets/brand/logo-new-white-green-a5cb16e0ae.svg',
     hackerearth: process.env.HACKEREARTH_LOGO_URL || 'https://static.hackerearth.com/static/hackerearth/images/logo/HE_logo.png',
+  },
+
+  // Cloudinary Configuration
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
 
   // WhatsApp Configuration

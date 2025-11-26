@@ -9,11 +9,14 @@ const {
   updatePlatformUsernameSchema,
 } = require('../validators/schemas');
 
+const { uploadAvatar } = require('../middleware/upload');
+
 // All routes are protected
 router.use(protect);
 
 router.get('/profile', userController.getUserProfile);
 router.put('/profile', validateRequest(updateProfileSchema), userController.updateUserProfile);
+router.post('/avatar', uploadAvatar, userController.uploadAvatar);
 router.get('/dashboard', userController.getUserDashboard);
 
 router.post('/link-platform', validateRequest(linkPlatformSchema), userController.linkPlatform);
