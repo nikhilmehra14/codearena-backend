@@ -28,12 +28,19 @@ router.get('/check-email',  validateRequest(checkEmailSchema), authController.ch
 
 // Public routes
 router.post('/register', registerLimiter, validateRequest(registerSchema), authController.register);
-router.post('/login', authLimiter, validateRequest(loginSchema), authController.login);
+// router.post('/login', authLimiter, validateRequest(loginSchema), authController.login);
+router.post('/login', validateRequest(loginSchema), authController.login);
 router.post('/refresh', authController.refreshToken);
-router.post('/verify-otp', authLimiter, validateRequest(verifyOTPSchema), authController.verifyOTP);
-router.post('/resend-otp', authLimiter, validateRequest(resendOTPSchema), authController.resendOTP);
-router.post('/forgot-password', authLimiter, validateRequest(forgotPasswordSchema), authController.forgotPassword);
-router.post('/reset-password/:token', authLimiter, validateRequest(resetPasswordSchema), authController.resetPassword);
+// router.post('/verify-otp', authLimiter, validateRequest(verifyOTPSchema), authController.verifyOTP);
+// router.post('/resend-otp', authLimiter, validateRequest(resendOTPSchema), authController.resendOTP);
+router.post('/verify-otp', validateRequest(verifyOTPSchema), authController.verifyOTP);
+router.post('/resend-otp', validateRequest(resendOTPSchema), authController.resendOTP);
+
+// router.post('/forgot-password', authLimiter, validateRequest(forgotPasswordSchema), authController.forgotPassword);
+router.post('/forgot-password', validateRequest(forgotPasswordSchema), authController.forgotPassword);
+
+// router.post('/reset-password/:token', authLimiter, validateRequest(resetPasswordSchema), authController.resetPassword);
+router.post('/reset-password/:token', validateRequest(resetPasswordSchema), authController.resetPassword);
 
 // Protected routes
 router.post('/logout', protect, authController.logout);
