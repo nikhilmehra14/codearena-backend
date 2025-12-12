@@ -12,11 +12,11 @@ RUN apk add --no-cache \
     g++ \
     postgresql-client
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and npm config
+COPY package*.json .npmrc ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --legacy-peer-deps --omit=dev
 
 # Copy source code
 COPY . .
