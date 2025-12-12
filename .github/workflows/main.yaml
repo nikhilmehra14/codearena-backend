@@ -106,9 +106,13 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codearena_test
         run: npm run prisma:generate
 
       - name: Validate Prisma Schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codearena_test
         run: npx prisma validate
 
       - name: Run Prisma Migrations
@@ -159,6 +163,8 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codearena_test
         run: npm run prisma:generate
 
       - name: Run Prisma Migrations
