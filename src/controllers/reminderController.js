@@ -17,6 +17,15 @@ const addReminder = asyncHandler(async (req, res) => {
   if (async === true) {
     const result = await reminderService.addReminderAsync(userId, contestId, time);
     
+    // Check if it was a toggle-off (removal)
+    if (result.isSet === false) {
+      return res.status(HttpStatus.OK.code).json({
+        success: true,
+        message: 'Reminder removed successfully',
+        data: result,
+      });
+    }
+
     return res.status(HttpStatus.ACCEPTED.code).json({
       success: true,
       message: 'Reminder is being created',
@@ -25,12 +34,20 @@ const addReminder = asyncHandler(async (req, res) => {
   }
 
   // Synchronous mode (default for backward compatibility)
-  const reminder = await reminderService.addReminder(userId, contestId, time);
+  const result = await reminderService.addReminder(userId, contestId, time);
+  
+  if (result.isSet === false) {
+    return res.status(HttpStatus.OK.code).json({
+      success: true,
+      message: 'Reminder removed successfully',
+      data: { isSet: false },
+    });
+  }
 
   res.status(HttpStatus.CREATED.code).json({
     success: true,
     message: 'Reminder added successfully',
-    data: reminder,
+    data: result,
   });
 });
 

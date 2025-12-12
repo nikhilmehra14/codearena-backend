@@ -31,7 +31,17 @@ class ReminderService {
     });
 
     if (existingReminder) {
-      throw new ConflictError('Reminder already exists for this contest');
+      await prisma.reminder.delete({
+        where: { id: existingReminder.id },
+      });
+
+      cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
+        logger.error(`Cache invalidation failed for user ${userId}:`, err);
+      });
+
+      logger.info(`Reminder deleted (toggled off) for user ${userId}, contest ${contestId}`);
+
+      return { isSet: false };
     }
 
     // Calculate scheduled time
@@ -61,7 +71,7 @@ class ReminderService {
 
     logger.info(`Reminder created for user ${userId}, contest ${contestId}`);
 
-    return reminder;
+    return { isSet: true, ...reminder };
   }
 
   // Add reminder async (queued - for high-scale operations)
@@ -95,7 +105,20 @@ class ReminderService {
     });
 
     if (existingReminder) {
-      throw new ConflictError('Reminder already exists for this contest');
+      // Toggle off: Delete existing reminder immediately (no need to queue deletion usually)
+      await prisma.reminder.delete({
+        where: { id: existingReminder.id },
+      });
+      
+      // Invalidate cache
+      cacheDelPattern(`reminders:user:${userId}*`).catch(() => {});
+
+      logger.info(`Reminder deleted (toggled off) for user ${userId}, contest ${contestId}`);
+
+      return {
+        isSet: false,
+        message: 'Reminder removed',
+      };
     }
 
     // Queue the reminder creation
@@ -104,6 +127,7 @@ class ReminderService {
     logger.info(`Reminder job ${job.id} queued for user ${userId}, contest ${contestId}`);
 
     return {
+      isSet: true,
       jobId: job.id,
       status: 'queued',
       message: 'Reminder is being created',
