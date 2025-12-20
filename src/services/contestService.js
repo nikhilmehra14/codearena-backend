@@ -393,12 +393,35 @@ class ContestService {
         return { synced: 0, total: externalContests.length };
       }
 
+      // Deduplicate contests based on URL
+      // Prefer platform-specific API data (cf_, lc_, etc.) over Clist data (clist_)
+      const urlMap = new Map();
+      for (const contest of contestsToSync) {
+        const url = contest.url;
+        if (!urlMap.has(url)) {
+          urlMap.set(url, contest);
+        } else {
+          const existing = urlMap.get(url);
+          // Prefer non-clist sources (they're usually more accurate)
+          if (existing.externalId.startsWith('clist_') && !contest.externalId.startsWith('clist_')) {
+            urlMap.set(url, contest);
+          }
+        }
+      }
+      
+      const deduplicatedContests = Array.from(urlMap.values());
+      const duplicatesRemoved = contestsToSync.length - deduplicatedContests.length;
+      
+      if (duplicatesRemoved > 0) {
+        logger.info(`Removed ${duplicatesRemoved} duplicate contests based on URL`);
+      }
+
       let syncedCount = 0;
       const BATCH_SIZE = BATCH_SIZES.CONTEST_SYNC;
 
       // Process contests in batches to avoid memory issues
-      for (let i = 0; i < contestsToSync.length; i += BATCH_SIZE) {
-        const batch = contestsToSync.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < deduplicatedContests.length; i += BATCH_SIZE) {
+        const batch = deduplicatedContests.slice(i, i + BATCH_SIZE);
         
         // Process batch with Promise.allSettled to handle individual failures
         const results = await Promise.allSettled(
@@ -449,7 +472,7 @@ class ContestService {
         logger.debug(`Processed batch ${i / BATCH_SIZE + 1}: ${results.filter(r => r.status === 'fulfilled').length}/${batch.length} successful`);
       }
 
-      logger.info(`Synced ${syncedCount} out of ${contestsToSync.length} contests (total fetched: ${externalContests.length})`);
+      logger.info(`Synced ${syncedCount} out of ${deduplicatedContests.length} contests (${duplicatesRemoved} duplicates removed, total fetched: ${externalContests.length})`);
 
       // Clear cache
       await cacheSet('contests:synced', Date.now(), 3600);
@@ -461,9 +484,47 @@ class ContestService {
     }
   }
 
+  // Helper: Enrich contests with reminder status for a user
+  async enrichContestsWithReminderStatus(contests, userId) {
+    if (!userId || !contests || contests.length === 0) {
+      // No user or no contests - mark all as not set
+      return contests.map(contest => ({ ...contest, isSet: false }));
+    }
+
+    try {
+      // Get all contest IDs
+      const contestIds = contests.map(c => c.id);
+
+      // Fetch all reminders for this user and these contests in one query
+      const reminders = await prisma.reminder.findMany({
+        where: {
+          userId,
+          contestId: { in: contestIds },
+          isActive: true,
+        },
+        select: {
+          contestId: true,
+        },
+      });
+
+      // Create a Set for O(1) lookup
+      const reminderSet = new Set(reminders.map(r => r.contestId));
+
+      // Enrich contests with isSet flag
+      return contests.map(contest => ({
+        ...contest,
+        isSet: reminderSet.has(contest.id),
+      }));
+    } catch (error) {
+      logger.error('Error enriching contests with reminder status:', error);
+      // On error, return contests with isSet: false
+      return contests.map(contest => ({ ...contest, isSet: false }));
+    }
+  }
+
   // Get all contests with filters
   async getContests(filters = {}) {
-    const { platform, status, page = 1, limit = 20, startDate, endDate } = filters;
+    const { platform, status, page = 1, limit = 20, startDate, endDate, userId, usePreferences = false } = filters;
 
     const cacheKey = `contests:list:${JSON.stringify(filters)}`;
     const cachedData = await cacheGet(cacheKey);
@@ -474,7 +535,18 @@ class ContestService {
 
     const where = { isActive: true };
 
-    if (platform) {
+    // Filter by user's preferred platforms if requested
+    if (usePreferences && userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferredPlatforms: true },
+      });
+
+      if (user && user.preferredPlatforms && Array.isArray(user.preferredPlatforms) && user.preferredPlatforms.length > 0) {
+        where.platform = { in: user.preferredPlatforms };
+      }
+    } else if (platform) {
+      // Otherwise use platform filter if provided
       where.platform = platform;
     }
 
@@ -506,8 +578,11 @@ class ContestService {
       prisma.contest.count({ where }),
     ]);
 
+    // Enrich contests with reminder status
+    const enrichedContests = await this.enrichContestsWithReminderStatus(contests, userId);
+
     const result = {
-      contests,
+      contests: enrichedContests,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -523,8 +598,8 @@ class ContestService {
   }
 
   // Get contest by ID
-  async getContestById(contestId) {
-    const cacheKey = `contest:${contestId}`;
+  async getContestById(contestId, userId = null) {
+    const cacheKey = `contest:${contestId}:${userId || 'public'}`;
     const cachedData = await cacheGet(cacheKey);
 
     if (cachedData) {
@@ -548,14 +623,17 @@ class ContestService {
       });
     }
 
-    await cacheSet(cacheKey, contest, 600);
+    // Enrich with reminder status
+    const [enrichedContest] = await this.enrichContestsWithReminderStatus([contest], userId);
 
-    return contest;
+    await cacheSet(cacheKey, enrichedContest, 600);
+
+    return enrichedContest;
   }
 
   // Get upcoming contests (next 7 days)
-  async getUpcomingContests(limit = 10) {
-    const cacheKey = `contests:upcoming:${limit}`;
+  async getUpcomingContests(limit = 10, userId = null) {
+    const cacheKey = `contests:upcoming:${limit}:${userId || 'public'}`;
     const cachedData = await cacheGet(cacheKey);
 
     if (cachedData) {
@@ -579,14 +657,17 @@ class ContestService {
       take: parseInt(limit),
     });
 
-    await cacheSet(cacheKey, contests, 300);
+    // Enrich with reminder status
+    const enrichedContests = await this.enrichContestsWithReminderStatus(contests, userId);
 
-    return contests;
+    await cacheSet(cacheKey, enrichedContests, 300);
+
+    return enrichedContests;
   }
 
   // Get contests by platform
-  async getContestsByPlatform(platform, limit = 20) {
-    const cacheKey = `contests:platform:${platform}:${limit}`;
+  async getContestsByPlatform(platform, limit = 20, userId = null) {
+    const cacheKey = `contests:platform:${platform}:${limit}:${userId || 'public'}`;
     const cachedData = await cacheGet(cacheKey);
 
     if (cachedData) {
@@ -603,9 +684,12 @@ class ContestService {
       take: parseInt(limit),
     });
 
-    await cacheSet(cacheKey, contests, 600);
+    // Enrich with reminder status
+    const enrichedContests = await this.enrichContestsWithReminderStatus(contests, userId);
 
-    return contests;
+    await cacheSet(cacheKey, enrichedContests, 600);
+
+    return enrichedContests;
   }
 
   // Helper: Determine contest status

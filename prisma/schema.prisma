@@ -37,8 +37,10 @@ model User {
   email                String            @unique @db.VarChar(100)
   password             String?           @db.VarChar(255)
   fullName             String?           @db.VarChar(100)
+  bio                  String?           @db.Text
   avatar               String?           @db.VarChar(500)
   phoneNumber          String?           @db.VarChar(20)
+  country              String?           @db.VarChar(100)
   authProvider         AuthProvider      @default(local)
   authProviderId       String?           @db.VarChar(100)
   isVerified           Boolean           @default(false)
@@ -49,6 +51,7 @@ model User {
   notifyViaEmail       Boolean           @default(false)
   darkMode             Boolean           @default(false)
   timezone             String            @default("UTC") @db.VarChar(50)
+  preferredPlatforms   Json              @default("[]") // Array of platform names user wants to see
   fcmToken             String?           @db.Text
   lastLogin            DateTime?
   isActive             Boolean           @default(true)

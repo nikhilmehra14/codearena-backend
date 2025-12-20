@@ -6,7 +6,8 @@ const { successResponse, paginatedResponse } = require('../utils/response');
 // @route   GET /api/v1/contests
 // @access  Public
 const getContests = asyncHandler(async (req, res) => {
-  const { platform, status, page, limit, startDate, endDate } = req.query;
+  const { platform, status, page, limit, startDate, endDate, usePreferences } = req.query;
+  const userId = req.user?.id; // Get userId from optionalAuth middleware
 
   const result = await contestService.getContests({
     platform,
@@ -15,6 +16,8 @@ const getContests = asyncHandler(async (req, res) => {
     limit: limit || 20,
     startDate,
     endDate,
+    userId, // Pass userId to service
+    usePreferences: usePreferences === 'true', // Convert string to boolean
   });
 
   paginatedResponse(
@@ -31,7 +34,8 @@ const getContests = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/contests/:id
 // @access  Public
 const getContestById = asyncHandler(async (req, res) => {
-  const contest = await contestService.getContestById(req.params.id);
+  const userId = req.user?.id; // Get userId from optionalAuth middleware
+  const contest = await contestService.getContestById(req.params.id, userId);
   successResponse(res, contest, 'Contest retrieved successfully');
 });
 
@@ -40,7 +44,8 @@ const getContestById = asyncHandler(async (req, res) => {
 // @access  Public
 const getUpcomingContests = asyncHandler(async (req, res) => {
   const { limit } = req.query;
-  const contests = await contestService.getUpcomingContests(limit || 10);
+  const userId = req.user?.id; // Get userId from optionalAuth middleware
+  const contests = await contestService.getUpcomingContests(limit || 10, userId);
   successResponse(res, contests, 'Upcoming contests retrieved successfully');
 });
 
@@ -50,7 +55,8 @@ const getUpcomingContests = asyncHandler(async (req, res) => {
 const getContestsByPlatform = asyncHandler(async (req, res) => {
   const { platform } = req.params;
   const { limit } = req.query;
-  const contests = await contestService.getContestsByPlatform(platform, limit || 20);
+  const userId = req.user?.id; // Get userId from optionalAuth middleware
+  const contests = await contestService.getContestsByPlatform(platform, limit || 20, userId);
   successResponse(res, contests, 'Platform contests retrieved successfully');
 });
 
