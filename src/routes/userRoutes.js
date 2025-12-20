@@ -24,6 +24,11 @@ router.delete('/unlink-platform/:platform', userController.unlinkPlatform);
 router.get('/linked-platforms', userController.getLinkedPlatforms);
 router.put('/platform/:platform', validateRequest(updatePlatformUsernameSchema), userController.updatePlatformUsername);
 
+// Session management routes
+router.get('/sessions', userController.getActiveSessions);
+router.delete('/sessions/:sessionId', userController.logoutSession);
+router.delete('/sessions', userController.logoutAllSessions);
+
 router.delete('/account', userController.deleteAccount);
 
 module.exports = router;

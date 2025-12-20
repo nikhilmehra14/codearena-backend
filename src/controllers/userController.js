@@ -98,6 +98,31 @@ const getUserDashboard = asyncHandler(async (req, res) => {
   successResponse(res, dashboard, 'Dashboard retrieved successfully');
 });
 
+// @desc    Get active sessions
+// @route   GET /api/v1/users/sessions
+// @access  Private
+const getActiveSessions = asyncHandler(async (req, res) => {
+  const sessions = await userService.getActiveSessions(req.user.id);
+  successResponse(res, sessions, 'Active sessions retrieved successfully');
+});
+
+// @desc    Logout specific session
+// @route   DELETE /api/v1/users/sessions/:sessionId
+// @access  Private
+const logoutSession = asyncHandler(async (req, res) => {
+  await userService.logoutSession(req.user.id, req.params.sessionId);
+  successResponse(res, null, 'Session logged out successfully');
+});
+
+// @desc    Logout all sessions except current
+// @route   DELETE /api/v1/users/sessions
+// @access  Private
+const logoutAllSessions = asyncHandler(async (req, res) => {
+  // TODO: Get current token ID from req.user or JWT
+  await userService.logoutAllSessions(req.user.id);
+  successResponse(res, null, 'All sessions logged out successfully');
+});
+
 module.exports = {
   getUserProfile,
   updateUserProfile,
@@ -108,4 +133,7 @@ module.exports = {
   updatePlatformUsername,
   deleteAccount,
   getUserDashboard,
+  getActiveSessions,
+  logoutSession,
+  logoutAllSessions,
 };

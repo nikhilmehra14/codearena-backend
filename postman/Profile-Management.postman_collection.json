@@ -1,0 +1,432 @@
+{
+  "info": {
+    "name": "CodeArena - Profile Management",
+    "description": "Postman collection for profile management features including bio, country, preferred platforms, and active sessions management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Profile Management",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Get the authenticated user's profile including bio, country, and preferred platforms"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile - Full",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Alex Johnson\",\n  \"bio\": \"Competitive programmer | Algorithm enthusiast | Problem solver\",\n  \"country\": \"India\",\n  \"phoneNumber\": \"+15551234567\",\n  \"timezone\": \"Asia/Kolkata\",\n  \"preferredPlatforms\": [\"leetcode\", \"codeforces\", \"codechef\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Update user profile with bio, country, phone number, and preferred platforms"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile - Bio Only",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": \"Passionate about algorithms and data structures\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Update only the bio field"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile - Country",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country\": \"United States\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Update only the country field"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Preferred Platforms",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferredPlatforms\": [\"leetcode\", \"codeforces\", \"atcoder\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Update which platforms the user wants to see in their contest feed"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Session Management",
+      "item": [
+        {
+          "name": "Get Active Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "sessions"]
+            },
+            "description": "Get all active login sessions for the authenticated user"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Save first session ID for logout test",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data.length > 0) {",
+                  "        pm.collectionVariables.set('sessionId', response.data[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout Specific Session",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "sessions", "{{sessionId}}"]
+            },
+            "description": "Logout a specific session by session ID. Use the sessionId from Get Active Sessions."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout All Sessions",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "sessions"]
+            },
+            "description": "Logout all sessions except the current one"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Contest Filtering",
+      "item": [
+        {
+          "name": "Get All Contests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"]
+            },
+            "description": "Get all contests from all platforms (default behavior)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contests - With Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests?usePreferences=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"],
+              "query": [
+                {
+                  "key": "usePreferences",
+                  "value": "true",
+                  "description": "Filter contests by user's preferred platforms"
+                }
+              ]
+            },
+            "description": "Get contests filtered by user's preferred platforms. Only shows contests from platforms in preferredPlatforms array."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contests - With Preferences & Pagination",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests?usePreferences=true&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"],
+              "query": [
+                {
+                  "key": "usePreferences",
+                  "value": "true"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get contests with preferences and pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contests - Specific Platform",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests?platform=leetcode",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"],
+              "query": [
+                {
+                  "key": "platform",
+                  "value": "leetcode",
+                  "description": "Filter by specific platform (overrides preferences)"
+                }
+              ]
+            },
+            "description": "Get contests from a specific platform (overrides user preferences)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contests - With isSet Flag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"]
+            },
+            "description": "Get contests with isSet flag showing which contests have reminders set"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complete Workflow",
+      "item": [
+        {
+          "name": "1. Get Current Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Update Profile with Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Alex Johnson\",\n  \"bio\": \"Competitive programmer | Algorithm enthusiast\",\n  \"country\": \"India\",\n  \"phoneNumber\": \"+15551234567\",\n  \"preferredPlatforms\": [\"leetcode\", \"codeforces\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Contests with Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contests?usePreferences=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["contests"],
+              "query": [
+                {
+                  "key": "usePreferences",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Get Active Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "sessions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Verify Profile Updated",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Complete workflow to test all profile management features in sequence"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Add any pre-request scripts here",
+          "// For example, you could refresh the access token if needed"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Status code is successful', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "if (pm.response.code === 200 || pm.response.code === 201) {",
+          "    pm.test('Response has success field', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData).to.have.property('success');",
+          "        pm.expect(jsonData.success).to.be.true;",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

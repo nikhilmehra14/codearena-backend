@@ -59,11 +59,15 @@ class UserService {
     const allowedFields = [
       'username',
       'fullName',
+      'bio',
       'avatar',
+      'phoneNumber',
+      'country',
       'timezone',
       'notificationEnabled',
       'notificationTime',
       'darkMode',
+      'preferredPlatforms',
     ];
 
     const updateData = {};
@@ -270,6 +274,105 @@ class UserService {
         activeReminders,
       },
     };
+  }
+
+  // Get active sessions for user
+  async getActiveSessions(userId) {
+    // Get all active refresh tokens for this user
+    const refreshTokens = await prisma.refreshToken.findMany({
+      where: {
+        userId,
+        isRevoked: false,
+        expiresAt: { gte: new Date() }, // Only non-expired tokens
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Get corresponding login activities
+    const sessions = await Promise.all(
+      refreshTokens.map(async (token) => {
+        // Find the most recent login activity for this device
+        const loginActivity = await prisma.loginActivity.findFirst({
+          where: {
+            userId,
+            deviceInfo: token.deviceInfo,
+          },
+          orderBy: {
+            loginAt: 'desc',
+          },
+        });
+
+        return {
+          id: token.id,
+          device: token.deviceInfo || 'Unknown Device',
+          browser: loginActivity?.browser || 'Unknown',
+          os: loginActivity?.os || 'Unknown',
+          ipAddress: loginActivity?.ipAddress || 'Unknown',
+          location: this.getLocationFromIP(loginActivity?.ipAddress),
+          lastActive: token.createdAt,
+          createdAt: token.createdAt,
+        };
+      })
+    );
+
+    return sessions;
+  }
+
+  // Helper to get location from IP (placeholder - can integrate with IP geolocation service)
+  getLocationFromIP(ipAddress) {
+    if (!ipAddress) return 'Unknown';
+    // TODO: Integrate with IP geolocation service like ipapi.co or ip-api.com
+    // For now, return a placeholder
+    return 'Unknown Location';
+  }
+
+  // Logout specific session
+  async logoutSession(userId, sessionId) {
+    const refreshToken = await prisma.refreshToken.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+      },
+    });
+
+    if (!refreshToken) {
+      throw new NotFoundError('Session not found');
+    }
+
+    // Revoke the refresh token
+    await prisma.refreshToken.update({
+      where: { id: sessionId },
+      data: { isRevoked: true },
+    });
+
+    logger.info(`Session ${sessionId} logged out for user ${userId}`);
+
+    return true;
+  }
+
+  // Logout all sessions except current
+  async logoutAllSessions(userId, currentTokenId = null) {
+    const where = {
+      userId,
+      isRevoked: false,
+    };
+
+    // If currentTokenId is provided, exclude it
+    if (currentTokenId) {
+      where.id = { not: currentTokenId };
+    }
+
+    // Revoke all refresh tokens except current
+    await prisma.refreshToken.updateMany({
+      where,
+      data: { isRevoked: true },
+    });
+
+    logger.info(`All sessions logged out for user ${userId} (except current)`);
+
+    return true;
   }
 }
 

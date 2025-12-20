@@ -115,6 +115,9 @@ const updateProfileSchema = z.object({
   body: z.object({
     username: usernameSchema.optional(),
     fullName: z.string().max(100, 'Full name must be less than 100 characters').trim().optional(),
+    bio: z.string().max(500, 'Bio must be less than 500 characters').trim().optional(),
+    country: z.string().max(100, 'Country must be less than 100 characters').trim().optional(),
+    phoneNumber: phoneNumberSchema,
     timezone: z.string().trim().optional(),
     notificationEnabled: z.boolean().optional(),
     notificationTime: z
@@ -124,6 +127,7 @@ const updateProfileSchema = z.object({
       .max(1440, 'Notification time must be less than 1440 minutes (24 hours)')
       .optional(),
     darkMode: z.boolean().optional(),
+    preferredPlatforms: z.array(platformSchema).max(10, 'Maximum 10 platforms allowed').optional(),
   }),
 });
 
