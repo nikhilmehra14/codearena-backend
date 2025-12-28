@@ -56,6 +56,7 @@ class ReminderService {
         reminderTime,
         scheduledTime,
         notificationSent: false,
+        isActive: true,
       },
       include: {
         contest: true,
@@ -143,7 +144,11 @@ class ReminderService {
     // Build where clause for reminders with contest filter
     const where = {
       userId,
-      isActive: true,
+      // Handle both null and false as inactive, only true is active
+      OR: [
+        { isActive: true },
+        { isActive: null }, // Handle legacy reminders without isActive field
+      ],
     };
 
     // If not including completed, filter by contest status
@@ -246,7 +251,7 @@ class ReminderService {
     return reminder;
   }
 
-  // Delete reminder
+  // Delete reminder (soft delete)
   async deleteReminder(reminderId, userId) {
     const reminder = await prisma.reminder.findFirst({
       where: {
@@ -259,8 +264,10 @@ class ReminderService {
       throw new NotFoundError('Reminder not found');
     }
 
-    await prisma.reminder.delete({
+    // Soft delete by setting isActive to false
+    await prisma.reminder.update({
       where: { id: reminderId },
+      data: { isActive: false },
     });
 
     // Fire-and-forget cache invalidation
@@ -319,13 +326,22 @@ class ReminderService {
   // Get reminder statistics for user
   async getUserReminderStats(userId) {
     const totalReminders = await prisma.reminder.count({
-      where: { userId, isActive: true },
+      where: { 
+        userId, 
+        OR: [
+          { isActive: true },
+          { isActive: null },
+        ],
+      },
     });
 
     const upcomingReminders = await prisma.reminder.count({
       where: {
         userId,
-        isActive: true,
+        OR: [
+          { isActive: true },
+          { isActive: null },
+        ],
         notificationSent: false,
         contest: {
           status: 'upcoming',
