@@ -67,10 +67,7 @@ const closeRedis = async () => {
     await redisClient.quit();
     logger.info('Redis connection closed');
   }
-};
-
-// Cache helper functions
-const cacheGet = async (key) => {
+};const cacheGet = async (key) => {
   try {
     const client = getRedisClient();
     if (!client) return null; // Redis not available

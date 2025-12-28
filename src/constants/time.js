@@ -36,10 +36,7 @@ module.exports = {
     FIVE_MINUTES: 300000,
     TEN_MINUTES: 600000,
     NOTIFICATION_DELAY: 100, // Delay between notifications to avoid overwhelming FCM
-  },
-
-  // Cache TTL (in seconds)
-  CACHE_TTL: {
+  },  CACHE_TTL: {
     SHORT: 300,      // 5 minutes
     MEDIUM: 600,     // 10 minutes
     LONG: 1800,      // 30 minutes
