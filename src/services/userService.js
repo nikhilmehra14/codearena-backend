@@ -15,13 +15,27 @@ class UserService {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        bio: true,
+        avatar: true,
+        phoneNumber: true,
+        country: true,
+        timezone: true,
+        notificationEnabled: true,
+        notificationTime: true,
+        darkMode: true,
+        preferredPlatforms: true,
+        isActive: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
         linkedPlatforms: {
           where: { isActive: true },
         },
-      },
-      omit: {
-        password: true,
       },
     });
 
@@ -80,8 +94,24 @@ class UserService {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
-      omit: {
-        password: true,
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        bio: true,
+        avatar: true,
+        phoneNumber: true,
+        country: true,
+        timezone: true,
+        notificationEnabled: true,
+        notificationTime: true,
+        darkMode: true,
+        preferredPlatforms: true,
+        isActive: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
