@@ -113,10 +113,7 @@ class UserService {
         createdAt: true,
         updatedAt: true,
       },
-    });
-
-    // Clear cache
-    await cacheDel(`user:${userId}`);
+    });    await cacheDel(`user:${userId}`);
 
     logger.info(`User profile updated: ${userId}`);
 
@@ -147,10 +144,7 @@ class UserService {
         platformUsername,
         isVerified: false,
       },
-    });
-
-    // Clear cache
-    await cacheDel(`user:${userId}`);
+    });    await cacheDel(`user:${userId}`);
 
     logger.info(`Platform ${platform} linked for user ${userId}`);
 
@@ -188,10 +182,7 @@ class UserService {
           platform,
         },
       }),
-    ]);
-
-    // Clear cache
-    await cacheDel(`user:${userId}`);
+    ]);    await cacheDel(`user:${userId}`);
     await cacheDel(`stats:${userId}:${platform}`);
 
     logger.info(`Platform ${platform} unlinked for user ${userId}`);
@@ -240,10 +231,7 @@ class UserService {
         platformUsername,
         isVerified: false,
       },
-    });
-
-    // Clear cache
-    await cacheDel(`user:${userId}`);
+    });    await cacheDel(`user:${userId}`);
     await cacheDel(`stats:${userId}:${platform}`);
 
     logger.info(`Platform username updated for ${platform}, user ${userId}`);
@@ -271,10 +259,7 @@ class UserService {
         where: { userId },
         data: { isActive: false },
       }),
-    ]);
-
-    // Clear cache
-    await cacheDel(`user:${userId}`);
+    ]);    await cacheDel(`user:${userId}`);
 
     logger.info(`User account deactivated: ${userId}`);
 
@@ -359,7 +344,7 @@ class UserService {
   }
 
   // Logout specific session
-  async logoutSession(userId, sessionId) {
+  async logoutSession(userId, sessionId, accessToken = null) {
     const refreshToken = await prisma.refreshToken.findFirst({
       where: {
         id: sessionId,
@@ -377,13 +362,19 @@ class UserService {
       data: { isRevoked: true },
     });
 
+    // Blacklist access token if provided
+    if (accessToken) {
+      const { blacklistToken } = require('../middleware/auth');
+      await blacklistToken(accessToken);
+    }
+
     logger.info(`Session ${sessionId} logged out for user ${userId}`);
 
     return true;
   }
 
   // Logout all sessions except current
-  async logoutAllSessions(userId, currentTokenId = null) {
+  async logoutAllSessions(userId, currentTokenId = null, accessToken = null) {
     const where = {
       userId,
       isRevoked: false,
@@ -399,6 +390,12 @@ class UserService {
       where,
       data: { isRevoked: true },
     });
+
+    // Blacklist access token if provided
+    if (accessToken) {
+      const { blacklistToken } = require('../middleware/auth');
+      await blacklistToken(accessToken);
+    }
 
     logger.info(`All sessions logged out for user ${userId} (except current)`);
 

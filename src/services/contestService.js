@@ -357,10 +357,7 @@ class ContestService {
         allContests = [...codeforces, ...leetcode, ...codechef, ...atcoder];
       }
       
-      allContests.sort((a, b) => a.startTimeUnix - b.startTimeUnix);
-
-      // Cache for 30 minutes
-      await cacheSet(cacheKey, allContests, config.cache.contestTTL || 1800);
+      allContests.sort((a, b) => a.startTimeUnix - b.startTimeUnix);      await cacheSet(cacheKey, allContests, config.cache.contestTTL || 1800);
 
       logger.info(`Fetched total ${allContests.length} contests from all platforms`);
       return allContests;
@@ -472,10 +469,7 @@ class ContestService {
         logger.debug(`Processed batch ${i / BATCH_SIZE + 1}: ${results.filter(r => r.status === 'fulfilled').length}/${batch.length} successful`);
       }
 
-      logger.info(`Synced ${syncedCount} out of ${deduplicatedContests.length} contests (${duplicatesRemoved} duplicates removed, total fetched: ${externalContests.length})`);
-
-      // Clear cache
-      await cacheSet('contests:synced', Date.now(), 3600);
+      logger.info(`Synced ${syncedCount} out of ${deduplicatedContests.length} contests (${duplicatesRemoved} duplicates removed, total fetched: ${externalContests.length})`);      await cacheSet('contests:synced', Date.now(), 3600);
 
       return { synced: syncedCount, total: externalContests.length, processed: contestsToSync.length };
     } catch (error) {
@@ -589,10 +583,7 @@ class ContestService {
         limit: parseInt(limit),
         totalPages: Math.ceil(count / limit),
       },
-    };
-
-    // Cache for 10 minutes
-    await cacheSet(cacheKey, result, 600);
+    };    await cacheSet(cacheKey, result, 600);
 
     return result;
   }

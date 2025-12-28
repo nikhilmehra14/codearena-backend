@@ -56,9 +56,8 @@ module.exports = {
     port: parseInt(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || '',
     db: parseInt(process.env.REDIS_DB) || 0,
-  },
-
-  // Cache Configuration
+  },  
+  
   cache: {
     ttl: parseInt(process.env.CACHE_TTL) || 3600, // 1 hour default
     contestTTL: 1800, // 30 minutes

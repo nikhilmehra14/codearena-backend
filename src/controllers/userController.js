@@ -3,25 +3,16 @@ const { asyncHandler } = require('../utils/errorHandler');
 const { successResponse } = require('../utils/response');
 const { HttpStatus } = require('../constants/httpStatus');
 
-// @desc    Get user profile
-// @route   GET /api/v1/users/profile
-// @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
   const user = await userService.getUserProfile(req.user.id);
   successResponse(res, user, 'User profile retrieved successfully');
 });
 
-// @desc    Update user profile
-// @route   PUT /api/v1/users/profile
-// @access  Private
 const updateUserProfile = asyncHandler(async (req, res) => {
   const user = await userService.updateUserProfile(req.user.id, req.body);
   successResponse(res, user, 'User profile updated successfully');
 });
 
-// @desc    Upload user avatar
-// @route   POST /api/v1/users/avatar
-// @access  Private
 const uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new BadRequestError('Please upload a file');
@@ -36,9 +27,6 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   successResponse(res, { avatar: avatarUrl }, 'Avatar uploaded successfully');
 });
 
-// @desc    Link platform account
-// @route   POST /api/v1/users/link-platform
-// @access  Private
 const linkPlatform = asyncHandler(async (req, res) => {
   const { platform, platformUsername } = req.body;
 
@@ -51,25 +39,16 @@ const linkPlatform = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Unlink platform account
-// @route   DELETE /api/v1/users/unlink-platform/:platform
-// @access  Private
 const unlinkPlatform = asyncHandler(async (req, res) => {
   await userService.unlinkPlatform(req.user.id, req.params.platform);
   successResponse(res, null, 'Platform unlinked successfully');
 });
 
-// @desc    Get linked platforms
-// @route   GET /api/v1/users/linked-platforms
-// @access  Private
 const getLinkedPlatforms = asyncHandler(async (req, res) => {
   const platforms = await userService.getLinkedPlatforms(req.user.id);
   successResponse(res, platforms, 'Linked platforms retrieved successfully');
 });
 
-// @desc    Update platform username
-// @route   PUT /api/v1/users/platform/:platform
-// @access  Private
 const updatePlatformUsername = asyncHandler(async (req, res) => {
   const { platformUsername } = req.body;
 
@@ -82,44 +61,41 @@ const updatePlatformUsername = asyncHandler(async (req, res) => {
   successResponse(res, linkedPlatform, 'Platform username updated successfully');
 });
 
-// @desc    Delete user account
-// @route   DELETE /api/v1/users/account
-// @access  Private
 const deleteAccount = asyncHandler(async (req, res) => {
   await userService.deleteAccount(req.user.id);
   successResponse(res, null, 'Account deleted successfully');
 });
 
-// @desc    Get user dashboard
-// @route   GET /api/v1/users/dashboard
-// @access  Private
 const getUserDashboard = asyncHandler(async (req, res) => {
   const dashboard = await userService.getUserDashboard(req.user.id);
   successResponse(res, dashboard, 'Dashboard retrieved successfully');
 });
 
-// @desc    Get active sessions
-// @route   GET /api/v1/users/sessions
-// @access  Private
 const getActiveSessions = asyncHandler(async (req, res) => {
   const sessions = await userService.getActiveSessions(req.user.id);
   successResponse(res, sessions, 'Active sessions retrieved successfully');
 });
 
-// @desc    Logout specific session
-// @route   DELETE /api/v1/users/sessions/:sessionId
-// @access  Private
 const logoutSession = asyncHandler(async (req, res) => {
-  await userService.logoutSession(req.user.id, req.params.sessionId);
+  // Extract access token from Authorization header
+  let accessToken = null;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    accessToken = req.headers.authorization.split(' ')[1];
+  }
+
+  await userService.logoutSession(req.user.id, req.params.sessionId, accessToken);
   successResponse(res, null, 'Session logged out successfully');
 });
 
-// @desc    Logout all sessions except current
-// @route   DELETE /api/v1/users/sessions
-// @access  Private
 const logoutAllSessions = asyncHandler(async (req, res) => {
+  // Extract access token from Authorization header
+  let accessToken = null;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    accessToken = req.headers.authorization.split(' ')[1];
+  }
+
   // TODO: Get current token ID from req.user or JWT
-  await userService.logoutAllSessions(req.user.id);
+  await userService.logoutAllSessions(req.user.id, null, accessToken);
   successResponse(res, null, 'All sessions logged out successfully');
 });
 

@@ -4,9 +4,6 @@ const { successResponse } = require('../utils/response');
 const IPUtils = require('../utils/ipUtils');
 const { HttpStatus } = require('../constants/httpStatus');
 
-// @desc    Check username availability
-// @route   GET /api/v1/auth/check-username
-// @access  Public
 const checkUsername = asyncHandler(async (req, res) => {
   const { username } = req.query;
 
@@ -22,10 +19,7 @@ const checkUsername = asyncHandler(async (req, res) => {
       success: false,
       message: 'Username must be less than 20 characters',
     });
-  }
-
-  // Validate username format (alphanumeric + underscore only)
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+  }  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
     return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
       message: 'Username can only contain letters, numbers, and underscores',
@@ -44,9 +38,6 @@ const checkUsername = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Check email availability
-// @route   GET /api/v1/auth/check-email
-// @access  Public
 const checkEmail = asyncHandler(async (req, res) => {
   const { email } = req.query;
 
@@ -55,10 +46,7 @@ const checkEmail = asyncHandler(async (req, res) => {
       success: false,
       message: 'Email is required',
     });
-  }
-
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  }  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(HttpStatus.BAD_REQUEST.code).json({
       success: false,
@@ -78,9 +66,6 @@ const checkEmail = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Register new user
-// @route   POST /api/v1/auth/register
-// @access  Public
 const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.body);
 
@@ -94,17 +79,8 @@ const register = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Login user
-// @route   POST /api/v1/auth/login
-// @access  Public
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-
-  // Extract IP address
-  const ip = IPUtils.extractIP(req);
-
-  // Extract user agent
-  const userAgent = req.headers['user-agent'];
+  const { email, password } = req.body;  const ip = IPUtils.extractIP(req);  const userAgent = req.headers['user-agent'];
 
   const { user, accessToken, refreshToken } = await authService.login(email, password, ip, userAgent);
 
@@ -119,9 +95,6 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Refresh access token
-// @route   POST /api/v1/auth/refresh
-// @access  Public
 const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
@@ -137,27 +110,23 @@ const refreshToken = asyncHandler(async (req, res) => {
   successResponse(res, { accessToken }, 'Token refreshed successfully');
 });
 
-// @desc    Logout user
-// @route   POST /api/v1/auth/logout
-// @access  Private
 const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
-  await authService.logout(req.user.id, refreshToken);
+  let accessToken = null;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    accessToken = req.headers.authorization.split(' ')[1];
+  }
+
+  await authService.logout(req.user.id, refreshToken, accessToken);
 
   successResponse(res, null, 'Logout successful');
 });
 
-// @desc    Get current user
-// @route   GET /api/v1/auth/me
-// @access  Private
 const getMe = asyncHandler(async (req, res) => {
   successResponse(res, req.user, 'User retrieved successfully');
 });
 
-// @desc    Update FCM token
-// @route   POST /api/v1/auth/fcm-token
-// @access  Private
 const updateFCMToken = asyncHandler(async (req, res) => {
   const { fcmToken } = req.body;
 
@@ -173,25 +142,11 @@ const updateFCMToken = asyncHandler(async (req, res) => {
   successResponse(res, user, 'FCM token updated successfully');
 });
 
-// @desc    Google OAuth callback
-// @route   GET /api/v1/auth/google/callback
-// @access  Public
-const googleCallback = asyncHandler(async (req, res) => {
-  // This will be handled by passport middleware
-  const { user, accessToken, refreshToken } = await authService.oauthLogin(req.user, 'google');
-
-  // Redirect to frontend with tokens
-  res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&refresh=${refreshToken}`);
+const googleCallback = asyncHandler(async (req, res) => {  const { user, accessToken, refreshToken } = await authService.oauthLogin(req.user, 'google');  res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&refresh=${refreshToken}`);
 });
 
-// @desc    GitHub OAuth callback
-// @route   GET /api/v1/auth/github/callback
-// @access  Public
 const githubCallback = asyncHandler(async (req, res) => {
-  const { user, accessToken, refreshToken } = await authService.oauthLogin(req.user, 'github');
-
-  // Redirect to frontend with tokens
-  res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&refresh=${refreshToken}`);
+  const { user, accessToken, refreshToken } = await authService.oauthLogin(req.user, 'github');  res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&refresh=${refreshToken}`);
 });
 
 module.exports = {
@@ -214,10 +169,7 @@ const updatePhoneNumber = asyncHandler(async (req, res) => {
 
   if (!phoneNumber) {
     throw new BadRequestError('Phone number is required');
-  }
-
-  // Format and validate phone number
-  const whatsappService = require('../services/whatsappService');
+  }  const whatsappService = require('../services/whatsappService');
   const formattedPhone = whatsappService.formatPhoneNumber(phoneNumber);
 
   if (!whatsappService.isValidPhoneNumber(formattedPhone)) {
@@ -251,7 +203,6 @@ const updateNotificationPreferences = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Test WhatsApp notification
 const testWhatsAppNotification = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const whatsappService = require('../services/whatsappService');
@@ -276,9 +227,6 @@ const testWhatsAppNotification = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Verify OTP
-// @route   POST /api/v1/auth/verify-otp
-// @access  Public
 const verifyOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
@@ -287,10 +235,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
       success: false,
       message: 'Email and OTP are required',
     });
-  }
-
-  // Extract IP address and user agent for activity tracking
-  const ip = IPUtils.extractIP(req);
+  }  const ip = IPUtils.extractIP(req);
   const userAgent = req.headers['user-agent'];
 
   const result = await authService.verifyOTP(email, otp, ip, userAgent);
@@ -306,9 +251,6 @@ const verifyOTP = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Resend OTP
-// @route   POST /api/v1/auth/resend-otp
-// @access  Public
 const resendOTP = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -327,9 +269,6 @@ const resendOTP = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Forgot Password - Request password reset
-// @route   POST /api/v1/auth/forgot-password
-// @access  Public
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -341,9 +280,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Reset Password - Set new password with token
-// @route   POST /api/v1/auth/reset-password/:token
-// @access  Public
 const resetPassword = asyncHandler(async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
@@ -356,9 +292,6 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get login history
-// @route   GET /api/v1/auth/login-history
-// @access  Private
 const getLoginHistory = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const limit = parseInt(req.query.limit) || 10;

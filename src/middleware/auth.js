@@ -5,6 +5,8 @@ const { asyncHandler } = require('../utils/errorHandler');
 const config = require('../config/config');
 const { USER_SELECT_FIELDS } = require('../constants/database');
 const ERROR_MESSAGES = require('../constants/errors');
+const { cacheGet, cacheSet } = require('../config/redis');
+const logger = require('../utils/logger');
 
 // Generate Access Token
 const generateAccessToken = (userId) => {
@@ -38,26 +40,55 @@ const verifyRefreshToken = (token) => {
   }
 };
 
+// Helper function to blacklist a token
+const blacklistToken = async (token) => {
+  try {
+    // Decode token to get expiration time
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.exp) {
+      logger.warn('Cannot blacklist token: invalid or missing expiration');
+      return;
+    }
+
+    // Calculate TTL (time until token expires)
+    const now = Math.floor(Date.now() / 1000);
+    const ttl = decoded.exp - now;
+
+    // Only blacklist if token hasn't expired yet
+    if (ttl > 0) {
+      const blacklistKey = `blacklist:${token}`;
+      await cacheSet(blacklistKey, 'revoked', ttl);
+      logger.debug(`Token blacklisted with TTL: ${ttl}s`);
+    }
+  } catch (error) {
+    logger.error('Error blacklisting token:', error);  }
+};
+
+// Helper function to check if token is blacklisted
+const isTokenBlacklisted = async (token) => {
+  try {
+    const blacklistKey = `blacklist:${token}`;
+    const result = await cacheGet(blacklistKey);
+    return result !== null;
+  } catch (error) {
+    logger.error('Error checking token blacklist:', error);    return false;
+  }
+};
+
 // Protect middleware - Verify JWT token
 const protect = asyncHandler(async (req, res, next) => {
-  let token;
-
-  // Check for token in Authorization header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  let token;  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
-  }
-
-  // Check if token exists
-  if (!token) {
+  }  if (!token) {
     throw new UnauthorizedError(ERROR_MESSAGES.AUTH.NO_TOKEN);
   }
 
   try {
-    // Verify token
-    const decoded = verifyAccessToken(token);
-
-    // Get user from token using centralized select fields
-    const user = await prisma.user.findUnique({
+    // Check if token is blacklisted (logged out)
+    const isBlacklisted = await isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      throw new UnauthorizedError('Token has been revoked');
+    }    const decoded = verifyAccessToken(token);    const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: USER_SELECT_FIELDS,
     });
@@ -83,18 +114,21 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 
   if (token) {
     try {
-      const decoded = verifyAccessToken(token);
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: USER_SELECT_FIELDS,
-      });
+      // Check if token is blacklisted (logged out)
+      const isBlacklisted = await isTokenBlacklisted(token);
+      if (!isBlacklisted) {
+        // Only set user if token is not blacklisted
+        const decoded = verifyAccessToken(token);
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: USER_SELECT_FIELDS,
+        });
 
-      if (user && user.isActive) {
-        req.user = user;
+        if (user && user.isActive) {
+          req.user = user;
+        }
       }
-    } catch (error) {
-      // Silent fail for optional auth
-    }
+    } catch (error) {    }
   }
 
   next();
@@ -118,4 +152,6 @@ module.exports = {
   protect,
   optionalAuth,
   requireAdmin,
+  blacklistToken,
+  isTokenBlacklisted,
 };

@@ -235,10 +235,7 @@ class ReminderService {
           scheduledTime,
           notificationSent: false,
         },
-      });
-
-      // Clear cache
-      // Fire-and-forget cache invalidation
+      });      // Fire-and-forget cache invalidation
       cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
         logger.error(`Cache invalidation failed for user ${userId}:`, err);
       });

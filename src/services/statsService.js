@@ -173,11 +173,10 @@ class StatsService {
           userId,
           platform,
         },
-        isActive: true,
       },
     });
 
-    if (!linkedPlatform) {
+    if (!linkedPlatform || !linkedPlatform.isActive) {
       throw new NotFoundError('Platform not linked');
     }
 
@@ -262,10 +261,7 @@ class StatsService {
         
         throw error;
       }
-    }
-
-    // Cache the stats
-    await cacheSet(cacheKey, stats, config.cache.statsTTL);
+    }    await cacheSet(cacheKey, stats, config.cache.statsTTL);
 
     return stats;
   }
@@ -311,11 +307,10 @@ class StatsService {
           userId,
           platform,
         },
-        isActive: true,
       },
     });
 
-    if (!linkedPlatform) {
+    if (!linkedPlatform || !linkedPlatform.isActive) {
       throw new NotFoundError('Platform not linked');
     }
 
@@ -371,10 +366,7 @@ class StatsService {
         isVerified: true,
         lastSynced: new Date(),
       },
-    });
-
-    // Update cache
-    const cacheKey = `stats:${userId}:${platform}`;
+    });    const cacheKey = `stats:${userId}:${platform}`;
     await cacheSet(cacheKey, stats, config.cache.statsTTL);
 
     logger.info(`Stats synced for ${platform}, user ${userId}`);

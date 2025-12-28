@@ -42,10 +42,7 @@ class AuthService {
       },
     });
 
-    const isAvailable = count === 0;
-
-    // Cache the result (5 minutes)
-    await cacheSet(cacheKey, isAvailable ? 'available' : 'taken', 300);
+    const isAvailable = count === 0;    await cacheSet(cacheKey, isAvailable ? 'available' : 'taken', 300);
 
     logger.debug(`Username availability: ${normalizedUsername} - ${isAvailable ? 'available' : 'taken'}`);
 
@@ -75,10 +72,7 @@ class AuthService {
       },
     });
 
-    const isAvailable = count === 0;
-
-    // Cache the result (5 minutes)
-    await cacheSet(cacheKey, isAvailable ? 'available' : 'taken', 300);
+    const isAvailable = count === 0;    await cacheSet(cacheKey, isAvailable ? 'available' : 'taken', 300);
 
     logger.debug(`Email availability: ${normalizedEmail} - ${isAvailable ? 'available' : 'taken'}`);
 
@@ -361,9 +355,7 @@ class AuthService {
   }
 
   // Logout user
-  async logout(userId, refreshToken) {
-    // Revoke refresh token
-    await prisma.refreshToken.updateMany({
+  async logout(userId, refreshToken, accessToken = null) {    await prisma.refreshToken.updateMany({
       where: {
         userId,
         token: refreshToken,
@@ -373,8 +365,11 @@ class AuthService {
       },
     });
 
-    // Clear user cache
-    await cacheDel(`user:${userId}`);
+    // Blacklist access token if provided
+    if (accessToken) {
+      const { blacklistToken } = require('../middleware/auth');
+      await blacklistToken(accessToken);
+    }    await cacheDel(`user:${userId}`);
 
     logger.info(`User logged out: ${userId}`);
   }
@@ -775,10 +770,7 @@ class AuthService {
     await cacheDel(tokenKey);
 
     // Clear any password reset rate limits
-    await cacheDel(`password-reset:ratelimit:${email}`);
-
-    // Clear user cache
-    await cacheDel(`user:${userId}`);
+    await cacheDel(`password-reset:ratelimit:${email}`);    await cacheDel(`user:${userId}`);
 
     logger.info(`Password reset successful for user: ${email}`);
 
