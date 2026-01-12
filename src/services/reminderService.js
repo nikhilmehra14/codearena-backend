@@ -141,14 +141,19 @@ class ReminderService {
 
     const skip = (page - 1) * limit;
 
-    // Build where clause for reminders with contest filter
-    const where = {
+    // Build where clause for reminders
+    // Note: We need to handle isActive carefully for Prisma count()
+    const baseWhere = {
       userId,
-      // Handle both null and false as inactive, only true is active
-      OR: [
-        { isActive: true },
-        { isActive: null }, // Handle legacy reminders without isActive field
-      ],
+    };
+
+    // Build the complete where clause
+    const where = {
+      ...baseWhere,
+      // Only include active reminders (true or null for legacy data)
+      isActive: {
+        in: [true, null],
+      },
     };
 
     // If not including completed, filter by contest status
@@ -283,10 +288,9 @@ class ReminderService {
       where: {
         contestId,
         userId,
-        OR: [
-          { isActive: true },
-          { isActive: null },
-        ],
+        isActive: {
+          in: [true, null],
+        },
       },
     });
 
@@ -358,20 +362,18 @@ class ReminderService {
     const totalReminders = await prisma.reminder.count({
       where: { 
         userId, 
-        OR: [
-          { isActive: true },
-          { isActive: null },
-        ],
+        isActive: {
+          in: [true, null],
+        },
       },
     });
 
     const upcomingReminders = await prisma.reminder.count({
       where: {
         userId,
-        OR: [
-          { isActive: true },
-          { isActive: null },
-        ],
+        isActive: {
+          in: [true, null],
+        },
         notificationSent: false,
         contest: {
           status: 'upcoming',
