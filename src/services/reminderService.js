@@ -277,6 +277,39 @@ class ReminderService {
     return true;
   }
 
+  // Delete reminder by contest ID (for toggle behavior)
+  async deleteReminderByContest(contestId, userId) {
+    const reminder = await prisma.reminder.findFirst({
+      where: {
+        contestId,
+        userId,
+        OR: [
+          { isActive: true },
+          { isActive: null },
+        ],
+      },
+    });
+
+    if (!reminder) {
+      throw new NotFoundError('Reminder not found');
+    }
+
+    // Soft delete by setting isActive to false
+    await prisma.reminder.update({
+      where: { id: reminder.id },
+      data: { isActive: false },
+    });
+
+    // Fire-and-forget cache invalidation
+    cacheDelPattern(`reminders:user:${userId}*`).catch(err => {
+      logger.error(`Cache invalidation failed for user ${userId}:`, err);
+    });
+
+    logger.info(`Reminder for contest ${contestId} deleted for user ${userId}`);
+
+    return true;
+  }
+
   // Get pending reminders for notification
   async getPendingReminders() {
     const now = new Date();
