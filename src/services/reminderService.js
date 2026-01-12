@@ -144,11 +144,7 @@ class ReminderService {
     // Build where clause for reminders
     const where = {
       userId,
-      // Handle isActive being true or null (both mean active)
-      OR: [
-        { isActive: true },
-        { isActive: null },
-      ],
+      isActive: true, // Only get active reminders
     };
 
     // If not including completed, filter by contest status
